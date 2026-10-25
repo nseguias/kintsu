@@ -89,7 +89,7 @@ export default function Settings() {
 
       <Text style={s.label}>SHOW TOTALS IN</Text>
       <Segmented options={[{ label: 'USD', value: 'USD' }, { label: 'EUR', value: 'EUR' }, { label: 'XLM', value: 'XLM' }]} value={currency} onChange={(c) => setCurrency(c).then(() => setCur(c))} />
-      <Text style={Type.small}>Prices come from Stellar’s own exchange{net === 'testnet' ? '; on testnet they’re play prices' : ''}.</Text>
+      <Text style={Type.small}>Prices come from Stellar’s own exchange on mainnet, also while you’re on testnet.</Text>
 
       <List label="THIS PHONE">
         <Row icon="trash-outline" tone="negative" title="Remove wallet" detail="Then create a new one or bring back another" onPress={remove} />

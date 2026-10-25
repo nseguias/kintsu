@@ -85,7 +85,7 @@ export default function Home() {
           {st && total !== undefined ? money(total, st.currency) : '…'}
         </Text>
         {network === 'testnet' && st?.currency !== 'XLM' && (
-          <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Testnet: play prices, worth nothing</Text>
+          <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Testnet tokens at mainnet prices: not real money</Text>
         )}
         {!!unpriced.length && (
           <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Not counting {unpriced.join(', ')}: no price on Stellar right now</Text>
