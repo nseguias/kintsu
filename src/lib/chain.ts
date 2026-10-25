@@ -1,4 +1,4 @@
-import { Keypair, Networks, Operation, rpc, StrKey, TransactionBuilder, type Transaction, type xdr } from '@stellar/stellar-sdk';
+import { Asset, Keypair, Memo, Networks, Operation, rpc, StrKey, TransactionBuilder, type Transaction, type xdr } from '@stellar/stellar-sdk';
 
 // ponytail: testnet only; mainnet needs real funding instead of Friendbot.
 // No React Native imports here, so chain.test.ts can run it against testnet from Node.
@@ -20,6 +20,33 @@ export async function submit(tx: Transaction): Promise<void> {
   if (sent.status === 'ERROR') throw new Error(`Rejected: ${sent.errorResult?.result.type ?? 'unknown'}`);
   const done = await server.pollTransaction(sent.hash);
   if (done.status !== 'SUCCESS') throw new Error(`Transaction ${done.status}`);
+}
+
+export async function accountExists(address: string): Promise<boolean> {
+  try {
+    await server.getAccountEntry(address);
+    return true;
+  } catch (e) {
+    if (String(e).includes('not found')) return false;
+    throw e; // network trouble: don't act on a guess
+  }
+}
+
+/** XLM the account can send: balance minus the reserve Stellar locks (0.5 per entry, 2 base) and a fee. */
+export function spendable(entry: xdr.AccountEntry): number {
+  // ponytail: ignores sponsorship and offer liabilities; we create neither
+  return Math.max(0, Number(entry.balance) / 1e7 - (2 + entry.numSubEntries) * 0.5 - 0.001);
+}
+
+/** An unsigned XLM payment. Creates the recipient's account if it doesn't exist yet (needs ≥ 1 XLM). */
+export async function paymentTx(from: string, to: string, amount: string, memo = ''): Promise<Transaction> {
+  const tx = (await newTx(from)).addOperation(
+    (await accountExists(to))
+      ? Operation.payment({ destination: to, asset: Asset.native(), amount })
+      : Operation.createAccount({ destination: to, startingBalance: amount }),
+  );
+  if (memo) tx.addMemo(Memo.text(memo));
+  return tx.build();
 }
 
 /** Extra ed25519 signers on the account (the master key isn't listed). */

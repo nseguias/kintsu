@@ -1,4 +1,4 @@
-import { Link, useRouter } from 'expo-router';
+import { Link, useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -29,14 +29,16 @@ export default function Home() {
     }
   }, []);
 
+  // refresh whenever Home comes back into view (e.g. after sending)
+  useFocusEffect(useCallback(() => void refresh(), [refresh]));
+
   useEffect(() => {
     getWallet().then((w) => {
       setAddress(w?.account ?? '');
       setRekeyed(!!w && isRekeyed(w));
     });
     getBackups().then(setBackups);
-    refresh();
-  }, [refresh]);
+  }, []);
 
   return (
     <Screen noHeader>
@@ -52,7 +54,14 @@ export default function Home() {
         </Text>
         <Text selectable style={[Type.small, { fontFamily: 'monospace' }]}>{address}</Text>
         {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
-        <Button kind="secondary" title="Refresh" onPress={refresh} />
+        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <Button title="Send" disabled={!balance} onPress={() => router.push('/send')} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button kind="secondary" title="Refresh" onPress={refresh} />
+          </View>
+        </View>
       </View>
 
       <Text style={s.label}>BACKUPS</Text>

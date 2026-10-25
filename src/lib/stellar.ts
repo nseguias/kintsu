@@ -1,7 +1,7 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import * as SecureStore from 'expo-secure-store';
 
-import { isRekeyedTo, rekey, server } from '@/lib/chain';
+import { accountExists, isRekeyedTo, rekey, server } from '@/lib/chain';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until re-keyed, then its device key
 const ACCOUNT_KEY = 'wallet.account'; // the G… address, which is always the recovery key's
@@ -86,16 +86,6 @@ export async function recordBackups(kinds: BackupRecord['kind'][]): Promise<void
 
 export async function getBackups(): Promise<BackupRecord[]> {
   return JSON.parse((await SecureStore.getItemAsync(BACKUPS_KEY)) ?? '[]');
-}
-
-async function accountExists(address: string): Promise<boolean> {
-  try {
-    await server.getAccountEntry(address);
-    return true;
-  } catch (e) {
-    if (String(e).includes('not found')) return false;
-    throw e; // network trouble: don't call Friendbot on a guess
-  }
 }
 
 let funded: Promise<void> | undefined;
