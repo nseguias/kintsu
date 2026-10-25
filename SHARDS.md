@@ -53,15 +53,21 @@ fp = SHA-256(ed25519 public key)[0..4]
 
 **Rotate / wipe**: "Overwrite tags" re-runs backup; "Erase tag" writes an empty NDEF message.
 
-## Re-key: two keys
-- **Recovery key** = the wallet's own key (phrase, paper S… key, tags). The G… address is always its.
-- **Device key** = random, only in this phone's SecureStore, never backed up.
-- One atomic transaction signed by the recovery key (`src/lib/chain.ts`): master weight 2, device 1, thresholds low 1 / medium 1 / high 2, and every other ed25519 signer removed. So the device key can pay but can never change signers or thresholds; the recovery key alone can always do everything.
-- Runs automatically from Home once online, only if at least one backup exists, then the phone overwrites the recovery key with the device key. The device key is saved before submitting, so a crash can't lose a key the account trusts.
-- After a restore the same transaction fires the old phone's key. The old keys come from the on-chain signer list, so no recovery manifest is needed.
-- Costs 0.5 XLM of reserve for the signer. A stolen *unlocked* phone can still pay until step 6b (2FA) raises medium to 2.
-- Writing new tags needs the recovery key, so after re-key it means restoring from paper/tags first.
-- Tested on testnet: `TESTNET=1 npm test` (device pays, can't add a signer, gets fired, then can't pay).
+## Keys, weights and 2FA
+- **Recovery key** = the wallet's own key (phrase, paper S… key, tags); the G… address is always its. **Phone key** = random, only in this phone's SecureStore. **Second factors** = the YubiKey (OpenPGP Ed25519 key, over NFC) and later the helper service.
+- Weights double as roles (`src/lib/chain.ts`): recovery 5, phone 2, second factor 1. Thresholds: low 1, medium 2 without 2FA / 3 with it, high 5.
+  - Sending: phone alone (2) without 2FA; with 2FA phone + one factor (3). Factors without the phone (1 + 1) never reach 3.
+  - Changing keys: only the recovery key; phone + every factor is 4 < 5.
+- One transaction, `configure(recovery, phone, factors)`, signed by the recovery key sets exactly that state and removes every other signer. Used to:
+  - re-key after the first backup (automatic from Home once online); the phone then overwrites the recovery key with its own key, saving the new key before submitting so a crash can't lose it;
+  - restore: fires every old phone (weight 2), keeps the factors (weight 1);
+  - turn 2FA on (tap the YubiKey, then 2 tags + PIN) or off (lost YubiKey).
+- Accounts re-keyed by the first version (master 2, phone 1) are upgraded by the next `configure`.
+- Costs 0.5 XLM of reserve per signer. Tested on testnet: `TESTNET=1 npm test`.
+
+## YubiKey
+- Only the OpenPGP app's signing slot is used; FIDO (security-key logins), OTP, PIV and OATH are separate apps the commands can't reach.
+- Setup creates an Ed25519 key only in an empty slot, reuses an existing Ed25519 key, refuses any other key, records the fingerprint so gpg sees the slot as taken, and never spends the last PIN try.
 
 ## Tests
 - Unit (`npm test`): SEP-0005 vectors 1–5 incl. passphrase; SeedSigner dice vectors (50 and 99 rolls); random/camera lengths and camera never repeating; any 2 of 3 restore; wrong PIN, tamper and garbage fail; same tag twice and mixed wallets rejected; short PIN rejected; 95 bytes < 716; no shared prefix across backups.

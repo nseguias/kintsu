@@ -5,11 +5,16 @@ import { Asset, Keypair, Memo, Networks, Operation, rpc, StrKey, TransactionBuil
 export const NETWORK_PASSPHRASE = Networks.TESTNET;
 export const server = new rpc.Server('https://soroban-testnet.stellar.org');
 
-// Weights: the recovery key (account master) can do anything alone; the device key can pay but
-// never meet the high threshold, so it can't change signers or lock the recovery key out.
-export const MASTER_WEIGHT = 2;
-export const DEVICE_WEIGHT = 1;
-const THRESHOLDS = { lowThreshold: 1, medThreshold: 1, highThreshold: 2 };
+// Weights double as roles: 5 = recovery key (account master), 2 = a phone, 1 = a second factor
+// (YubiKey, later the helper service).
+//   send (medium):        2 without 2FA → phone alone; 3 with 2FA → phone + one second factor.
+//                         Second factors alone (1 + 1) never reach 3 without the phone.
+//   change keys (high):   5 → only the recovery key; phone + every factor (2 + 1 + 1) is 4.
+export const MASTER_WEIGHT = 5;
+export const DEVICE_WEIGHT = 2;
+export const COSIGNER_WEIGHT = 1;
+const HIGH = 5;
+const medium = (cosigners: string[]) => (cosigners.length ? 3 : 2);
 
 export const newTx = async (account: string) =>
   new TransactionBuilder(await server.getAccount(account), { fee: '1000', networkPassphrase: NETWORK_PASSPHRASE }).setTimeout(60);
@@ -55,37 +60,56 @@ export const signersOf = (entry: xdr.AccountEntry) =>
     s.key.type === 'signerKeyTypeEd25519' ? [{ key: StrKey.encodeEd25519PublicKey(Buffer.from(s.key.ed25519.value)), weight: s.weight }] : [],
   );
 
-/** True once `device` is the only extra signer and the weights/thresholds are ours. */
-export function isRekeyedTo(entry: xdr.AccountEntry, device: string): boolean {
+/**
+ * Second factors (YubiKey, helper) on the account. Accounts re-keyed by the first version (master
+ * weight 2, phone weight 1) had none, and their weight-1 signer is a phone, not a factor.
+ */
+export const cosignersOf = (entry: xdr.AccountEntry) =>
+  entry.thresholds.value[0] === MASTER_WEIGHT ? signersOf(entry).filter((s) => s.weight === COSIGNER_WEIGHT).map((s) => s.key) : [];
+
+/** Whether sending needs a second factor right now. */
+export const needs2fa = (entry: xdr.AccountEntry) => entry.thresholds.value[2] > DEVICE_WEIGHT;
+
+/** True if the account already has exactly these weights, thresholds and signers. */
+export function isConfigured(entry: xdr.AccountEntry, device: string, cosigners: string[]): boolean {
   const [master, low, med, high] = entry.thresholds.value;
-  const signers = signersOf(entry);
+  const want = new Map([[device, DEVICE_WEIGHT], ...cosigners.map((c) => [c, COSIGNER_WEIGHT] as const)]);
+  const have = signersOf(entry);
   return (
-    master === MASTER_WEIGHT &&
-    low === THRESHOLDS.lowThreshold &&
-    med === THRESHOLDS.medThreshold &&
-    high === THRESHOLDS.highThreshold &&
-    signers.length === 1 &&
-    signers[0].key === device &&
-    signers[0].weight === DEVICE_WEIGHT
+    master === MASTER_WEIGHT && low === 1 && med === medium(cosigners) && high === HIGH &&
+    have.length === want.size && have.every((s) => want.get(s.key) === s.weight)
   );
 }
 
 /**
- * One atomic transaction signed by the recovery key: sets the weights and thresholds, adds `device`,
- * and removes every other extra signer (old phones). Used for the first re-key and after a restore.
- * ponytail: removes *all* other ed25519 signers; an imported account with someone else's co-signers
- * loses them. Fine for wallets made here; ask first if we ever import shared accounts.
+ * One atomic transaction signed by the recovery key that leaves the account with exactly: this
+ * `device` (phone), these `cosigners` (second factors), and the weights above. Everything else is
+ * removed. Used to re-key a new phone, after a restore (old phones fired, factors kept), and to
+ * turn 2FA on or off. ponytail: an imported account with someone else's signers loses them; fine
+ * for wallets made here, ask first if we ever import shared accounts.
  */
-export async function rekey(recovery: Keypair, device: string): Promise<void> {
+export async function configure(recovery: Keypair, device: string, cosigners: string[]): Promise<void> {
   const account = recovery.publicKey();
   const entry = await server.getAccountEntry(account);
   const tx = (await newTx(account)).addOperation(
-    Operation.setOptions({ masterWeight: MASTER_WEIGHT, ...THRESHOLDS, signer: { ed25519PublicKey: device, weight: DEVICE_WEIGHT } }),
+    Operation.setOptions({
+      masterWeight: MASTER_WEIGHT,
+      lowThreshold: 1,
+      medThreshold: medium(cosigners),
+      highThreshold: HIGH,
+      signer: { ed25519PublicKey: device, weight: DEVICE_WEIGHT },
+    }),
   );
+  for (const c of cosigners) tx.addOperation(Operation.setOptions({ signer: { ed25519PublicKey: c, weight: COSIGNER_WEIGHT } }));
   for (const s of signersOf(entry)) {
-    if (s.key !== device) tx.addOperation(Operation.setOptions({ signer: { ed25519PublicKey: s.key, weight: 0 } }));
+    if (s.key !== device && !cosigners.includes(s.key)) tx.addOperation(Operation.setOptions({ signer: { ed25519PublicKey: s.key, weight: 0 } }));
   }
   const built = tx.build();
   built.sign(recovery);
   await submit(built);
+}
+
+/** Gives a (new) phone its key: fires every other phone, keeps the second factors. */
+export async function rekey(recovery: Keypair, device: string): Promise<void> {
+  await configure(recovery, device, cosignersOf(await server.getAccountEntry(recovery.publicKey())));
 }

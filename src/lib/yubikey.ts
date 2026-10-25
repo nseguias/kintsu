@@ -85,11 +85,15 @@ let simKey: Keypair | undefined;
  * One tap: returns the YubiKey's Stellar address. Creates the Ed25519 signing key only if the
  * OpenPGP signing slot is empty; an existing Ed25519 key is reused; any other key is refused.
  */
-export async function setupYubiKey(adminPin: string): Promise<string> {
+export async function setupYubiKey(adminPin: string, pin?: string): Promise<string> {
   if (await simulated) return (simKey ??= Keypair.random()).publicKey();
   return session(async (send) => {
     const existing = await readSigningKey(send);
-    if (existing?.recorded) return StrKey.encodeEd25519PublicKey(Buffer.from(existing.pub));
+    // also check the signing PIN now, so 2FA is never turned on with a PIN that then fails at send time
+    if (existing?.recorded) {
+      if (pin) await checkPin(send, 0x81, pin);
+      return StrKey.encodeEd25519PublicKey(Buffer.from(existing.pub));
+    }
     await checkPin(send, 0x83, adminPin);
     let pub = existing?.pub;
     if (!pub) {
@@ -101,6 +105,7 @@ export async function setupYubiKey(adminPin: string): Promise<string> {
     const created = Math.floor(Date.now() / 1000);
     await send(putData(0xc7, ed25519Fingerprint(pub, created)));
     await send(putData(0xce, [created >>> 24, (created >>> 16) & 255, (created >>> 8) & 255, created & 255]));
+    if (pin) await checkPin(send, 0x81, pin);
     return StrKey.encodeEd25519PublicKey(Buffer.from(pub));
   });
 }

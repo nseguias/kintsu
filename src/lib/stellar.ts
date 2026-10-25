@@ -1,7 +1,7 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import * as SecureStore from 'expo-secure-store';
 
-import { accountExists, isRekeyedTo, rekey, server } from '@/lib/chain';
+import { accountExists, cosignersOf, isConfigured, rekey, server } from '@/lib/chain';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until re-keyed, then its device key
 const ACCOUNT_KEY = 'wallet.account'; // the G… address, which is always the recovery key's
@@ -65,7 +65,8 @@ export function ensureRekeyed(): Promise<void> {
     const pending = await SecureStore.getItemAsync(PENDING_KEY);
     const device = pending ? Keypair.fromSecret(pending) : Keypair.random();
     if (!pending) await SecureStore.setItemAsync(PENDING_KEY, device.secret());
-    if (!isRekeyedTo(await server.getAccountEntry(w.account), device.publicKey())) await rekey(w.signer, device.publicKey());
+    const entry = await server.getAccountEntry(w.account);
+    if (!isConfigured(entry, device.publicKey(), cosignersOf(entry))) await rekey(w.signer, device.publicKey());
     await SecureStore.setItemAsync(ACCOUNT_KEY, w.account);
     await SecureStore.setItemAsync(SIGNER_KEY, device.secret()); // the recovery key leaves this phone here
     await SecureStore.deleteItemAsync(PENDING_KEY);

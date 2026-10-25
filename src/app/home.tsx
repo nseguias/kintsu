@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 
 import { Button, Screen, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { needs2fa, server } from '@/lib/chain';
 import { startDraft } from '@/lib/draft';
 import { ensureRekeyed, getBackups, getWallet, getXlmBalance, isRekeyed, type BackupRecord } from '@/lib/stellar';
 
@@ -16,6 +17,7 @@ export default function Home() {
   const [error, setError] = useState('');
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [rekeyed, setRekeyed] = useState<boolean>();
+  const [twoFactor, setTwoFactor] = useState<boolean>();
 
   const refresh = useCallback(async () => {
     setError('');
@@ -24,6 +26,7 @@ export default function Home() {
       await ensureRekeyed();
       const w = await getWallet();
       setRekeyed(!!w && isRekeyed(w));
+      if (w) setTwoFactor(needs2fa(await server.getAccountEntry(w.account)));
     } catch (e) {
       setError(String(e).includes('Network') ? "Can't reach Stellar. Turn airplane mode off to see your balance." : String(e));
     }
@@ -83,6 +86,11 @@ export default function Home() {
         <View style={[s.card, { gap: 4 }]}>
           <Text style={Type.heading}>This phone has its own key ✓</Text>
           <Text style={Type.small}>It can send, but can’t change who controls the wallet. Your recovery key is only on your backups.</Text>
+          {twoFactor ? (
+            <Text style={[Type.small, { color: Colors.positive }]}>2FA on: every payment also needs your YubiKey.</Text>
+          ) : twoFactor === false ? (
+            <Button kind="secondary" title="Turn on 2FA with a YubiKey" onPress={() => router.push('/two-factor')} />
+          ) : null}
         </View>
       ) : (
         <>

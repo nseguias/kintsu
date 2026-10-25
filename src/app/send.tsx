@@ -3,10 +3,11 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
-import { Button, Screen, s } from '@/components/ui';
+import { Button, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
-import { accountExists, paymentTx, server, spendable, submit } from '@/lib/chain';
+import { accountExists, cosignersOf, needs2fa, paymentTx, server, spendable, submit } from '@/lib/chain';
 import { getWallet } from '@/lib/stellar';
+import { signWithYubiKey } from '@/lib/yubikey';
 
 const AMOUNT = /^\d+(\.\d{1,7})?$/; // Stellar amounts have 7 decimals
 const memoBytes = (m: string) => new TextEncoder().encode(m).length;
@@ -18,7 +19,8 @@ export default function Send() {
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [review, setReview] = useState<{ tx: Transaction; creates: boolean }>();
+  const [review, setReview] = useState<{ tx: Transaction; creates: boolean; factors: string[] }>();
+  const [pin, setPin] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState('');
@@ -46,7 +48,8 @@ export default function Send() {
     try {
       const creates = !(await accountExists(dest));
       if (creates && Number(amount) < 1) throw new Error('That address has no account yet. The first payment to it must be at least 1 XLM.');
-      setReview({ tx: await paymentTx(account, dest, amount, memo), creates });
+      const entry = await server.getAccountEntry(account);
+      setReview({ tx: await paymentTx(account, dest, amount, memo), creates, factors: needs2fa(entry) ? cosignersOf(entry) : [] });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -57,12 +60,21 @@ export default function Send() {
     setError('');
     setBusy('Sending…');
     try {
-      const { tx } = review!;
+      const { tx, factors } = review!;
+      if (factors.length) {
+        setBusy('Hold your YubiKey flat against the back of your phone');
+        const { address, signature } = await signWithYubiKey(tx.hash(), pin);
+        if (!factors.includes(address)) throw new Error('That YubiKey isn’t one of this wallet’s second factors.');
+        tx.addSignature(address, Buffer.from(signature).toString('base64'));
+        setBusy('Sending…');
+      }
       tx.sign((await getWallet())!.signer);
       await submit(tx);
       setSent(Buffer.from(tx.hash()).toString('hex'));
     } catch (e) {
-      setError((e as Error).message);
+      // a half-signed transaction can't be retried as is; Review builds a fresh one
+      setReview(undefined);
+      setError((e as Error).message || 'Lost the YubiKey. Hold it still and try again.');
     }
     setBusy('');
   };
@@ -104,9 +116,16 @@ export default function Send() {
           {review.creates && <Text style={[Type.small, { color: Colors.accent }]}>This address is new to Stellar; this payment opens its account.</Text>}
         </View>
         <Text style={Type.small}>Check the first and last characters of the address against where you copied it from.</Text>
+        {review.factors.length > 0 && (
+          <SecretInput secureTextEntry keyboardType="number-pad" placeholder="YubiKey PIN" value={pin} onChangeText={setPin} />
+        )}
         {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
         <View style={{ flex: 1 }} />
-        <Button title={`Send ${amount} XLM`} onPress={send} />
+        <Button
+          title={review.factors.length ? `Tap YubiKey and send ${amount} XLM` : `Send ${amount} XLM`}
+          disabled={review.factors.length > 0 && pin.length < 6}
+          onPress={send}
+        />
         <Button kind="link" title="Change" onPress={() => setReview(undefined)} />
       </Screen>
     );

@@ -32,6 +32,7 @@ export default function RootLayout() {
         <Stack.Screen name="backup-tags" options={{ title: 'NFC tags' }} />
         <Stack.Screen name="restore" options={{ title: 'Restore from tags' }} />
         <Stack.Screen name="send" options={{ title: 'Send XLM' }} />
+        <Stack.Screen name="two-factor" options={{ title: 'Two-factor' }} />
         <Stack.Screen name="home" options={{ headerShown: false }} />
         <Stack.Screen name="nfc-check" options={{ title: 'NFC check' }} />
       </Stack>
