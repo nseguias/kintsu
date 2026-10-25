@@ -1,4 +1,5 @@
 // ponytail: dev-only hardware checks (NFC tags, native scrypt); not part of the user flow.
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ndef } from 'react-native-nfc-manager';
@@ -6,9 +7,11 @@ import { scrypt as nativeScrypt } from 'react-native-quick-crypto';
 import { scrypt } from '@crypto/kdf';
 
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { forgetWallet } from '@/lib/stellar';
 import { cancelTap, readRecords, simulated, textOf, writeRecords } from '@/lib/nfc';
 
 export default function NfcCheck() {
+  const router = useRouter();
   const [text, setText] = useState('hello shards');
   const [status, setStatus] = useState('Idle');
   const [sim, setSim] = useState(false);
@@ -55,6 +58,15 @@ export default function NfcCheck() {
       <Pressable style={styles.btn} onPress={kdf}><Text style={styles.btnText}>Check scrypt</Text></Pressable>
       <Pressable onPress={cancelTap}><Text style={[Type.small, { textAlign: 'center' }]}>Cancel</Text></Pressable>
       <Text selectable style={[Type.body, { marginTop: Spacing.lg }]}>{status}</Text>
+      {/* ponytail: dev-only stand-in for wiping the app; a real wipe also clears the emulator's simulated tags */}
+      <Pressable
+        onPress={async () => {
+          await forgetWallet();
+          if (router.canDismiss()) router.dismissAll();
+          router.replace('/');
+        }}>
+        <Text style={[Type.small, { textAlign: 'center', color: Colors.negative, marginTop: Spacing.xl }]}>Forget wallet (dev)</Text>
+      </Pressable>
     </View>
   );
 }

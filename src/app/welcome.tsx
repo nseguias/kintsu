@@ -18,6 +18,7 @@ export default function Welcome() {
       <View style={{ flex: 1 }} />
       <Choice title="Create a new wallet" body="A fresh 12 or 24-word recovery phrase" selected={false} onPress={() => router.push('/create')} />
       <Choice title="Import a wallet" body="Type a recovery phrase or an S… key from your paper" selected={false} onPress={() => router.push('/import')} />
+      <Choice title="Restore from NFC tags" body="Any 2 of your 3 tags plus your PIN" selected={false} onPress={() => router.push('/restore')} />
     </Screen>
   );
 }

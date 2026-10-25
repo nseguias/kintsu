@@ -30,6 +30,7 @@ export default function RootLayout() {
         <Stack.Screen name="verify" options={{ title: 'Check your paper' }} />
         <Stack.Screen name="backup-key" options={{ title: 'Secret key' }} />
         <Stack.Screen name="backup-tags" options={{ title: 'NFC tags' }} />
+        <Stack.Screen name="restore" options={{ title: 'Restore from tags' }} />
         <Stack.Screen name="home" options={{ headerShown: false }} />
         <Stack.Screen name="nfc-check" options={{ title: 'NFC check' }} />
       </Stack>

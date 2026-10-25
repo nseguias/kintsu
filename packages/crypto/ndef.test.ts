@@ -18,5 +18,8 @@ describe('tag record', () => {
     expect(r.type).toBe('application/octet-stream');
     expect(r.id).toHaveLength(0);
     expect(bytes.length).toBeLessThan(144); // fits even the smallest common tag (NTAG213)
+    // Android can hand the type back as bytes; the app's isType check must still match
+    const asBytes = { ...r, type: Array.from('application/octet-stream', (c) => c.charCodeAt(0)) };
+    expect(Ndef.isType(asBytes as never, Ndef.TNF_MIME_MEDIA, 'application/octet-stream')).toBe(true);
   });
 });

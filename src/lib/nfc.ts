@@ -4,6 +4,7 @@ import NfcManager, { Ndef, NfcTech, type NdefRecord } from 'react-native-nfc-man
 // write lands on a fresh blank tag. Only the phone proves real tags work.
 export const simulated: Promise<boolean> = NfcManager.isSupported().then((ok) => !ok, () => true);
 export const simTags: number[][] = [];
+let simReads = 0; // each simulated read taps the next fake tag, round-robin
 
 simulated.then((sim) => {
   if (!sim) NfcManager.start().catch((e) => console.warn('NFC start failed:', e));
@@ -31,7 +32,11 @@ export async function writeRecords(records: NdefRecord[]): Promise<void> {
 }
 
 export async function readRecords(): Promise<{ id?: string; techTypes?: string[]; records: NdefRecord[] }> {
-  if (await simulated) return { id: 'SIMULATED', techTypes: ['simulated'], records: simTags.length ? Ndef.decodeMessage(simTags.at(-1)!) : [] };
+  if (await simulated) {
+    if (!simTags.length) return { id: 'SIM-0', techTypes: ['simulated'], records: [] };
+    const i = simReads++ % simTags.length;
+    return { id: `SIM-${i + 1}`, techTypes: ['simulated'], records: Ndef.decodeMessage(simTags[i]) };
+  }
   return withNdef(async () => {
     const tag = await NfcManager.getTag();
     return { id: tag?.id, techTypes: tag?.techTypes, records: tag?.ndefMessage ?? [] };
@@ -47,7 +52,10 @@ export class TagError extends Error {
   }
 }
 
-const sameBytes = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+const MIME = 'application/octet-stream';
+const sameBytes = (a: ArrayLike<number>, b: ArrayLike<number>) => a.length === b.length && Array.from(a).every((x, i) => x === b[i]);
+// Android may hand back `type` as bytes or as a string; isType copes with both
+const isShard = (r: NdefRecord) => Ndef.isType(r, Ndef.TNF_MIME_MEDIA, MIME);
 
 /**
  * One tap: refuses a tag listed in `usedIds` or (unless `overwrite`) one that already holds data,
@@ -56,7 +64,7 @@ const sameBytes = (a: number[], b: number[]) => a.length === b.length && a.every
  */
 export async function writeVerified(payload: Uint8Array, usedIds: string[], overwrite: boolean): Promise<string> {
   // application/octet-stream: says nothing about what the bytes are or which app wrote them
-  const bytes = Ndef.encodeMessage([Ndef.record(Ndef.TNF_MIME_MEDIA, 'application/octet-stream', [], Array.from(payload))]) as number[];
+  const bytes = Ndef.encodeMessage([Ndef.record(Ndef.TNF_MIME_MEDIA, MIME, [], Array.from(payload))]) as number[];
   if (await simulated) {
     simTags.push(bytes);
     return `SIM-${simTags.length}`;
@@ -68,9 +76,17 @@ export async function writeVerified(payload: Uint8Array, usedIds: string[], over
     if (!overwrite && tag?.ndefMessage?.length) throw new TagError('hasData', 'This tag already has something on it.');
     await NfcManager.ndefHandler.writeNdefMessage(bytes, { reconnectAfterWrite: true });
     const back = (await NfcManager.ndefHandler.getNdefMessage())?.ndefMessage ?? [];
-    if (!sameBytes(Ndef.encodeMessage(back) as number[], bytes)) {
+    if (back.length !== 1 || !isShard(back[0]) || !sameBytes(back[0].payload, payload)) {
       throw new TagError('mismatch', 'The tag didn’t keep the data. Try again, or use another tag.');
     }
     return id;
   });
+}
+
+/** One tap: returns the backup bytes on the tag. Whether they're really ours only the PIN can tell. */
+export async function readShardBytes(): Promise<{ id: string; bytes: Uint8Array }> {
+  const { id, records } = await readRecords();
+  const r = records.find(isShard);
+  if (!r) throw new Error(records.length ? 'This tag isn’t one of your backup tags.' : 'This tag is empty.');
+  return { id: id ?? '', bytes: Uint8Array.from(r.payload) };
 }

@@ -23,6 +23,14 @@ async function requireKeypair(): Promise<Keypair> {
   return kp;
 }
 
+/** Removes the wallet from this phone. Only its backups can bring it back. */
+export async function forgetWallet(): Promise<void> {
+  await SecureStore.deleteItemAsync(SECRET_KEY);
+  await SecureStore.deleteItemAsync(BACKUPS_KEY);
+  keypair = undefined;
+  funded = undefined;
+}
+
 export async function saveWallet(seed: Uint8Array): Promise<void> {
   const kp = Keypair.fromRawEd25519Seed(Buffer.from(seed));
   await SecureStore.setItemAsync(SECRET_KEY, kp.secret());
