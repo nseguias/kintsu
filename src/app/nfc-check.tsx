@@ -7,7 +7,11 @@ import { scrypt as nativeScrypt } from 'react-native-quick-crypto';
 import { scrypt } from '@crypto/kdf';
 
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
-import { forgetWallet } from '@/lib/stellar';
+import { Asset, Operation } from '@stellar/stellar-sdk';
+
+import { newTx, submit } from '@/lib/chain';
+import { forgetWallet, getWallet } from '@/lib/stellar';
+import { setupYubiKey, signWithYubiKey } from '@/lib/yubikey';
 import { cancelTap, readRecords, simulated, textOf, writeRecords } from '@/lib/nfc';
 
 export default function NfcCheck() {
@@ -15,6 +19,9 @@ export default function NfcCheck() {
   const [text, setText] = useState('hello shards');
   const [status, setStatus] = useState('Idle');
   const [sim, setSim] = useState(false);
+  const [pin, setPin] = useState('123456'); // ponytail: testnet dev screen; factory-default OpenPGP PINs
+  const [adminPin, setAdminPin] = useState('12345678');
+  const [yubi, setYubi] = useState('');
   useEffect(() => void simulated.then(setSim), []);
 
   const run = (label: string, fn: () => Promise<string>) => async () => {
@@ -49,6 +56,23 @@ export default function NfcCheck() {
     return `${rfc === '7023bdcb3afd7348461c06cd81fd38ebfda8fbba904f8e3ea9b543f6545da1f2' ? '✅' : '❌'} RFC 7914 vector\n${ms} ms per tag (N=2^15)`;
   });
 
+  const setup = run('YubiKey', async () => {
+    const address = await setupYubiKey(adminPin);
+    setYubi(address);
+    return `YubiKey address\n${address}`;
+  });
+
+  // the Mac test, over NFC: a real testnet payment from the YubiKey's own account to this wallet
+  const yubiPay = run('YubiKey', async () => {
+    const to = (await getWallet())!.account;
+    const tx = (await newTx(yubi)).addOperation(Operation.payment({ destination: to, asset: Asset.native(), amount: '1' })).build();
+    setStatus('YubiKey: hold it flat against the back of the phone…');
+    const { signature } = await signWithYubiKey(tx.hash(), pin, yubi);
+    tx.addSignature(yubi, Buffer.from(signature).toString('base64'));
+    await submit(tx);
+    return `✅ Testnet accepted 1 XLM signed by the YubiKey\n${Buffer.from(tx.hash()).toString('hex').slice(0, 16)}…`;
+  });
+
   return (
     <View style={styles.root}>
       {sim && <Text style={[Type.small, { color: Colors.accent }]}>No NFC hardware: using a simulated tag.</Text>}
@@ -56,6 +80,12 @@ export default function NfcCheck() {
       <Pressable style={styles.btn} onPress={write}><Text style={styles.btnText}>Write text record</Text></Pressable>
       <Pressable style={styles.btn} onPress={read}><Text style={styles.btnText}>Read tag</Text></Pressable>
       <Pressable style={styles.btn} onPress={kdf}><Text style={styles.btnText}>Check scrypt</Text></Pressable>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <TextInput style={[styles.input, { flex: 1 }]} value={pin} onChangeText={setPin} placeholder="PIN" />
+        <TextInput style={[styles.input, { flex: 1 }]} value={adminPin} onChangeText={setAdminPin} placeholder="Admin PIN" />
+      </View>
+      <Pressable style={styles.btn} onPress={setup}><Text style={styles.btnText}>Set up YubiKey</Text></Pressable>
+      {!!yubi && <Pressable style={styles.btn} onPress={yubiPay}><Text style={styles.btnText}>Send 1 XLM signed by the YubiKey</Text></Pressable>}
       <Pressable onPress={cancelTap}><Text style={[Type.small, { textAlign: 'center' }]}>Cancel</Text></Pressable>
       <Text selectable style={[Type.body, { marginTop: Spacing.lg }]}>{status}</Text>
       {/* ponytail: dev-only stand-in for wiping the app; a real wipe also clears the emulator's simulated tags */}
