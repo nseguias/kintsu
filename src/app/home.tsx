@@ -5,7 +5,7 @@ import { Text, View } from 'react-native';
 import { Button, Screen, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { startDraft } from '@/lib/draft';
-import { getBackups, getKeypair, getXlmBalance, type BackupRecord } from '@/lib/stellar';
+import { ensureRekeyed, getBackups, getWallet, getXlmBalance, isRekeyed, type BackupRecord } from '@/lib/stellar';
 
 const LABEL: Record<BackupRecord['kind'], string> = { phrase: 'Recovery phrase on paper', key: 'Secret key on paper', tags: 'NFC tags' };
 
@@ -15,18 +15,25 @@ export default function Home() {
   const [balance, setBalance] = useState<number>();
   const [error, setError] = useState('');
   const [backups, setBackups] = useState<BackupRecord[]>([]);
+  const [rekeyed, setRekeyed] = useState<boolean>();
 
   const refresh = useCallback(async () => {
     setError('');
     try {
       setBalance(await getXlmBalance());
+      await ensureRekeyed();
+      const w = await getWallet();
+      setRekeyed(!!w && isRekeyed(w));
     } catch (e) {
       setError(String(e).includes('Network') ? "Can't reach Stellar. Turn airplane mode off to see your balance." : String(e));
     }
   }, []);
 
   useEffect(() => {
-    getKeypair().then((kp) => setAddress(kp?.publicKey() ?? ''));
+    getWallet().then((w) => {
+      setAddress(w?.account ?? '');
+      setRekeyed(!!w && isRekeyed(w));
+    });
     getBackups().then(setBackups);
     refresh();
   }, [refresh]);
@@ -63,15 +70,30 @@ export default function Home() {
         </View>
       )}
 
-      <Button
-        kind="secondary"
-        title={backups.some((b) => b.kind === 'tags') ? 'Write new NFC tags' : 'Back up to NFC tags'}
-        onPress={async () => {
-          // works for any wallet, created here or imported: tags hold the same key either way
-          startDraft({ rawSeed: (await getKeypair())!.rawSecretKey(), imported: false });
-          router.push('/backup-tags');
-        }}
-      />
+      {rekeyed ? (
+        <View style={[s.card, { gap: 4 }]}>
+          <Text style={Type.heading}>This phone has its own key ✓</Text>
+          <Text style={Type.small}>It can send, but can’t change who controls the wallet. Your recovery key is only on your backups.</Text>
+        </View>
+      ) : (
+        <>
+          {backups.length > 0 && rekeyed === false && (
+            <Text style={Type.small}>Next time you’re online, this phone gets its own key and the recovery key is removed from it.</Text>
+          )}
+          {/* ponytail: needs the recovery key, so only before re-key; after it, restore from paper/tags first */}
+          <Button
+            kind="secondary"
+            title={backups.some((b) => b.kind === 'tags') ? 'Write new NFC tags' : 'Back up to NFC tags'}
+            onPress={async () => {
+              // works for any wallet, created here or imported: tags hold the same key either way
+              const w = (await getWallet())!;
+              if (isRekeyed(w)) return; // the device key on tags would restore nothing
+              startDraft({ rawSeed: w.signer.rawSecretKey(), imported: false });
+              router.push('/backup-tags');
+            }}
+          />
+        </>
+      )}
 
       <View style={{ flex: 1, minHeight: Spacing.xl }} />
       <Link href="/nfc-check" style={[Type.small, { textAlign: 'center', padding: Spacing.md }]}>NFC test (dev)</Link>

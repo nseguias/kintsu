@@ -53,6 +53,16 @@ fp = SHA-256(ed25519 public key)[0..4]
 
 **Rotate / wipe**: "Overwrite tags" re-runs backup; "Erase tag" writes an empty NDEF message.
 
+## Re-key: two keys
+- **Recovery key** = the wallet's own key (phrase, paper S… key, tags). The G… address is always its.
+- **Device key** = random, only in this phone's SecureStore, never backed up.
+- One atomic transaction signed by the recovery key (`src/lib/chain.ts`): master weight 2, device 1, thresholds low 1 / medium 1 / high 2, and every other ed25519 signer removed. So the device key can pay but can never change signers or thresholds; the recovery key alone can always do everything.
+- Runs automatically from Home once online, only if at least one backup exists, then the phone overwrites the recovery key with the device key. The device key is saved before submitting, so a crash can't lose a key the account trusts.
+- After a restore the same transaction fires the old phone's key. The old keys come from the on-chain signer list, so no recovery manifest is needed.
+- Costs 0.5 XLM of reserve for the signer. A stolen *unlocked* phone can still pay until step 6b (2FA) raises medium to 2.
+- Writing new tags needs the recovery key, so after re-key it means restoring from paper/tags first.
+- Tested on testnet: `TESTNET=1 npm test` (device pays, can't add a signer, gets fired, then can't pay).
+
 ## Tests
 - Unit (`npm test`): SEP-0005 vectors 1–5 incl. passphrase; SeedSigner dice vectors (50 and 99 rolls); random/camera lengths and camera never repeating; any 2 of 3 restore; wrong PIN, tamper and garbage fail; same tag twice and mixed wallets rejected; short PIN rejected; 95 bytes < 716; no shared prefix across backups.
 - Manual: back up → clear app data → restore with tags 1 + 3 → same G-address.
