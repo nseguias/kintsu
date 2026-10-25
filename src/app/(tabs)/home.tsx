@@ -1,5 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fmt, money } from '@/components/activity-row';
@@ -14,6 +14,13 @@ const ROW = 72; // every row in the Home list is this tall, so we can show only 
 
 export default function Home() {
   const router = useRouter();
+  // Send and Swap come back here with a one-line confirmation, shown for a few seconds
+  const { done, doneDetail } = useLocalSearchParams<{ done?: string; doneDetail?: string }>();
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => router.setParams({ done: undefined, doneDetail: undefined }), 5000);
+    return () => clearTimeout(t);
+  }, [done, router]);
   const [st, setSt] = useState<Status>();
   const [error, setError] = useState('');
   const [address, setAddress] = useState('');
@@ -72,6 +79,12 @@ export default function Home() {
           </Text>
         </Pressable>
       </View>
+
+      {!!done && (
+        <List>
+          <Row icon="checkmark-circle" tone="positive" title={done} detail={doneDetail} />
+        </List>
+      )}
 
       {st && !st.backedUp && (
         <List>

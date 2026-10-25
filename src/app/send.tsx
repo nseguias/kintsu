@@ -28,7 +28,6 @@ export default function Send() {
   const [askPin, setAskPin] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [sent, setSent] = useState('');
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
@@ -76,7 +75,7 @@ export default function Send() {
     try {
       const { tx } = review!;
       await approve(tx, pin, () => setBusy('Hold your YubiKey flat against the back of your phone'));
-      setSent(Buffer.from(tx.hash()).toString('hex'));
+      router.navigate({ pathname: '/home', params: { done: 'Sent', doneDetail: `${amount} ${code} to ${dest.slice(0, 6)}…${dest.slice(-6)}` } });
     } catch (e) {
       // a half-signed transaction can't be retried as is; Review builds a fresh one
       setReview(undefined);
@@ -119,19 +118,6 @@ export default function Send() {
   }
 
   if (busy) return <Screen><Busy message={busy} /></Screen>;
-
-  if (sent) {
-    return (
-      <Screen>
-        <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.md }}>
-          <Text style={[Type.title, { textAlign: 'center' }]}>Sent ✓</Text>
-          <Text style={[Type.body, { textAlign: 'center' }]}>{amount} {code} is on its way.</Text>
-          <Text selectable style={[Type.small, { textAlign: 'center' }]}>Transaction {sent.slice(0, 8)}…{sent.slice(-8)}</Text>
-        </View>
-        <Button title="Done" onPress={() => router.back()} />
-      </Screen>
-    );
-  }
 
   if (review && askPin) {
     return (

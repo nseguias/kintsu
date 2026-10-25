@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
@@ -14,6 +14,7 @@ const SLIPPAGE = 0.01; // the swap fails rather than fill more than 1% below the
 const keyOf = (t?: Token) => (t ? `${t.code}:${t.issuer}` : 'XLM');
 
 export default function Swap() {
+  const router = useRouter();
   const [account, setAccount] = useState('');
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [xlmFree, setXlmFree] = useState(0);
@@ -25,7 +26,6 @@ export default function Swap() {
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [done, setDone] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -73,9 +73,8 @@ export default function Swap() {
     try {
       const tx = await swapTx(account, fromToken, toToken, amount, q!.amount * (1 - SLIPPAGE), q!.path, addTo);
       await approve(tx, pin, () => setBusy('Hold your YubiKey flat against the back of your phone'));
-      setDone(`${amount} ${fromCode} → about ${fmt(q!.amount)} ${toCode}`);
       setAmount('');
-      load();
+      router.navigate({ pathname: '/home', params: { done: 'Swap complete', doneDetail: `${amount} ${fromCode} → about ${fmt(q!.amount)} ${toCode}` } });
     } catch (e) {
       setError((e as Error).message || 'Lost the YubiKey. Hold it still and try again.');
     }
@@ -84,18 +83,6 @@ export default function Swap() {
   };
 
   if (busy) return <Screen><Busy message={busy} /></Screen>;
-
-  if (done) {
-    return (
-      <Screen>
-        <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.md }}>
-          <Text style={[Type.title, { textAlign: 'center' }]}>Swapped ✓</Text>
-          <Text style={[Type.body, { textAlign: 'center' }]}>{done}</Text>
-        </View>
-        <Button title="Swap again" onPress={() => setDone('')} />
-      </Screen>
-    );
-  }
 
   const flip = () => {
     if (!payable.some((h) => keyOf(h.token) === toKey)) return;
