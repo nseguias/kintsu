@@ -158,12 +158,26 @@ const PEG: Record<Currency, string | undefined> = { USD: 'USDC', EUR: 'EURC', XL
 const assetParam = (prefix: string, t?: Token) =>
   t ? `${prefix}_asset_type=credit_alphanum${t.code.length > 4 ? 12 : 4}&${prefix}_asset_code=${t.code}&${prefix}_asset_issuer=${t.issuer}` : `${prefix}_asset_type=native`;
 
-/** What `amount` of `from` buys of `to` on Stellar's mainnet exchange right now (best path), or null. */
-async function quote(from: Token | undefined, to: Token | undefined, amount: number): Promise<number | null> {
-  const res = await fetch(`${NETWORKS.mainnet.horizon}/paths/strict-send?${assetParam('source', from)}&source_amount=${amount.toFixed(7)}&destination_assets=${to ? `${to.code}:${to.issuer}` : 'native'}`);
+/** What `amount` of `from` buys of `to` on a network's exchange right now (best path), or null. */
+export async function quote(from: Token | undefined, to: Token | undefined, amount: number, on: Network = network): Promise<{ amount: number; path: Asset[] } | null> {
+  const res = await fetch(`${NETWORKS[on].horizon}/paths/strict-send?${assetParam('source', from)}&source_amount=${amount.toFixed(7)}&destination_assets=${to ? `${to.code}:${to.issuer}` : 'native'}`);
   if (!res.ok) return null;
   const best = (await res.json())._embedded?.records?.[0];
-  return best ? Number(best.destination_amount) : null;
+  if (!best) return null;
+  type Hop = { asset_type: string; asset_code: string; asset_issuer: string };
+  return { amount: Number(best.destination_amount), path: best.path.map((h: Hop) => (h.asset_type === 'native' ? Asset.native() : new Asset(h.asset_code, h.asset_issuer))) };
+}
+
+/**
+ * An unsigned swap: sells exactly `amount` of `from` for at least `min` of `to`, paid to this same
+ * account along `path`. Adds `to` first when the account doesn't hold it yet (one transaction).
+ */
+export async function swapTx(account: string, from: Token | undefined, to: Token | undefined, amount: string, min: number, path: Asset[], addTo: boolean): Promise<Transaction> {
+  const tx = await newTx(account);
+  if (addTo && to) tx.addOperation(Operation.changeTrust({ asset: assetOf(to) }));
+  return tx
+    .addOperation(Operation.pathPaymentStrictSend({ sendAsset: assetOf(from), sendAmount: amount, destination: account, destAsset: assetOf(to), destMin: min.toFixed(7), path }))
+    .build();
 }
 
 /**
@@ -183,10 +197,10 @@ export async function priceIn(from: Token | undefined, currency: Currency): Prom
     from = TOKENS.mainnet.find((t) => t.code === code);
   }
   if (from?.code === to?.code) return 1;
-  const price = await quote(from, to, 1);
+  const price = (await quote(from, to, 1, 'mainnet'))?.amount;
   if (!price) return null;
-  const back = await quote(to, from, price);
-  return back !== null && back >= 0.95 ? price : null;
+  const back = (await quote(to, from, price, 'mainnet'))?.amount;
+  return back !== undefined && back >= 0.95 ? price : null;
 }
 
 /** What the account holds of a known token: null if it hasn't added it (no trustline). */
@@ -225,7 +239,8 @@ export function parsePaymentQr(text: string): PaymentRequest | null {
 /** SEP-7 link other wallets understand; what Receive shows as a QR. */
 export const paymentUri = (to: string) => `web+stellar:pay?destination=${to}`;
 
-export type Activity = { id: string; incoming: boolean; other: string; amount: string; code: string; at: string; tx: string };
+// `sold` is set on swaps (a path payment to yourself): what was paid, e.g. "100 XLM"
+export type Activity = { id: string; incoming: boolean; other: string; amount: string; code: string; at: string; tx: string; sold?: string };
 
 /** Horizon payment records (payment, create_account, path payments) → what History shows. Others are skipped. */
 export function toActivity(me: string, records: Record<string, string>[]): Activity[] {
@@ -237,7 +252,9 @@ export function toActivity(me: string, records: Record<string, string>[]): Activ
     }
     if (r.type === 'payment' || r.type.startsWith('path_payment')) {
       const incoming = r.to === me;
-      return [{ ...base, incoming, other: incoming ? r.from : r.to, amount: r.amount, code: r.asset_type === 'native' ? 'XLM' : r.asset_code }];
+      const code = r.asset_type === 'native' ? 'XLM' : r.asset_code;
+      const sold = r.from === me && r.to === me && r.source_amount ? `${Number(r.source_amount)} ${r.source_asset_type === 'native' ? 'XLM' : r.source_asset_code}` : undefined;
+      return [{ ...base, incoming, other: incoming ? r.from : r.to, amount: r.amount, code, ...(sold && { sold }) }];
     }
     return [];
   });

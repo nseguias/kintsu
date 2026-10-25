@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
+import { fmt } from '@/components/activity-row';
 import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, Segmented, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, needs2fa, parsePaymentQr, paymentTx, server, spendable } from '@/lib/chain';
@@ -16,6 +17,7 @@ export default function Send() {
   const router = useRouter();
   const [account, setAccount] = useState('');
   const [xlmMax, setXlmMax] = useState<number>();
+  const [xlmHeld, setXlmHeld] = useState(0);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [code, setCode] = useState('XLM');
   const [to, setTo] = useState('');
@@ -34,7 +36,9 @@ export default function Send() {
   useEffect(() => {
     getWallet().then(async (w) => {
       setAccount(w!.account);
-      setXlmMax(spendable(await server.getAccountEntry(w!.account)));
+      const entry = await server.getAccountEntry(w!.account);
+      setXlmMax(spendable(entry));
+      setXlmHeld(Number(entry.balance) / 1e7 - spendable(entry));
       setHoldings(await getHoldings());
     }, (e) => setError(String(e)));
   }, []);
@@ -192,7 +196,12 @@ export default function Send() {
         <TextInput style={[s.input, { flex: 1 }]} value={amount} onChangeText={setAmount} placeholder="0" keyboardType="decimal-pad" />
         {max !== undefined && <Button kind="link" title="Max" onPress={() => setAmount(String(Math.floor(max * 1e7) / 1e7))} />}
       </View>
-      {max !== undefined && <Text style={Type.small}>Available: {max.toLocaleString(undefined, { maximumFractionDigits: 7 })} {code}</Text>}
+      {max !== undefined && (
+        <Text style={Type.small}>
+          Available: {max.toLocaleString(undefined, { maximumFractionDigits: 7 })} {code}
+          {!token && xlmHeld > 0 && ` · ${fmt(xlmHeld)} XLM stays aside: Stellar’s deposit for this wallet, its keys and tokens`}
+        </Text>
+      )}
       <Text style={s.label}>MEMO (OPTIONAL)</Text>
       <TextInput style={s.input} value={memo} onChangeText={setMemo} placeholder="Exchanges often require one" />
       <ErrorText>{problem || error}</ErrorText>

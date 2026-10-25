@@ -12,13 +12,23 @@ const short = (g: string) => `${g.slice(0, 6)}…${g.slice(-6)}`;
 
 /** One payment in or out; tapping opens it on stellar.expert. */
 export function ActivityRow({ a }: { a: Activity }) {
-  return (
+  const date = new Date(a.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return a.sold ? (
+    <Row
+      oneLine
+      badge="swap-horizontal"
+      title="Swapped"
+      detail={`${fmt(a.sold.split(' ')[0])} ${a.sold.split(' ')[1]} → ${a.code} · ${date}`}
+      right={`+${fmt(a.amount)} ${a.code}`}
+      onPress={() => Linking.openURL(explorerUrl(a.tx))}
+    />
+  ) : (
     <Row
       oneLine
       badge={a.incoming ? 'arrow-down' : 'arrow-up'}
       badgeTone={a.incoming ? 'positive' : 'negative'}
       title={a.incoming ? 'Received' : 'Sent'}
-      detail={`${a.incoming ? 'From' : 'To'} ${short(a.other)} · ${new Date(a.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`}
+      detail={`${a.incoming ? 'From' : 'To'} ${short(a.other)} · ${date}`}
       right={`${a.incoming ? '+' : '−'}${fmt(a.amount)} ${a.code}`}
       rightTone={a.incoming ? 'positive' : undefined}
       onPress={() => Linking.openURL(explorerUrl(a.tx))}

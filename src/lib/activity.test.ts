@@ -11,9 +11,10 @@ describe('history rows', () => {
       { ...base, type: 'payment', from: 'GBOB', to: me, amount: '5.0000000', asset_type: 'credit_alphanum4', asset_code: 'USDC' },
       { ...base, type: 'payment', from: me, to: 'GBOB', amount: '1.0000000', asset_type: 'native' },
       { ...base, type: 'create_account', funder: 'GFRIEND', account: me, starting_balance: '10000.0000000' },
-      { ...base, type: 'path_payment_strict_send', from: me, to: me, amount: '86.8', asset_type: 'credit_alphanum4', asset_code: 'USDC' },
+      { ...base, type: 'path_payment_strict_send', from: me, to: me, amount: '86.8', asset_type: 'credit_alphanum4', asset_code: 'USDC', source_amount: '100.0000000', source_asset_type: 'native' },
       { ...base, type: 'change_trust' },
     ]);
+    expect(rows.map((r) => r.sold)).toEqual([undefined, undefined, undefined, '100 XLM']);
     expect(rows.map((r) => [r.incoming, r.other, r.amount, r.code])).toEqual([
       [true, 'GBOB', '5.0000000', 'USDC'],
       [false, 'GBOB', '1.0000000', 'XLM'],

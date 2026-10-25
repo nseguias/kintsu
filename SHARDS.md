@@ -69,6 +69,10 @@ fp = SHA-256(ed25519 public key)[0..4]
 - Tokens = code + issuer; only Circle's USDC and EURC (issuers checked against Circle's docs) are offered. Adding one is a trustline (0.5 XLM reserve) and is approved like a payment (phone, + YubiKey with 2FA). Tokens only go to accounts that added them.
 - History reads Horizon (RPC has no per-account history); rows open stellar.expert.
 
+## Swap and prices
+- Swap tab: a path payment to yourself on Stellar's exchange (Horizon finds the route), sell exactly X, fail if the result is >1% under the quote. Pay with anything held; get XLM or a checked token (not "top by volume": look-alike tokens dominate those lists). Getting a token you don't hold adds it in the same transaction.
+- Totals price every network's balances at mainnet rates (testnet's are made up), USD via USDC, EUR via EURC; a market that loses >5% on a round trip is too thin and isn't counted.
+
 ## Networks
 - Same address on testnet and mainnet (it's just the public key), separate balance and on-chain keys on each. Testnet by default; Settings switches. A protected phone stays on the network it's protected on.
 - Same behaviour on both: a new wallet is empty until its first deposit opens the account. Testnet adds a "Get 10,000 test XLM" button (Friendbot) instead of opening it silently.

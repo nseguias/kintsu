@@ -22,6 +22,7 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: Colors.card, borderTopColor: Colors.border, paddingTop: 6 },
       }}>
       <Tabs.Screen name="home" options={{ ...tab('Home', 'home'), headerShown: false }} />
+      <Tabs.Screen name="swap" options={tab('Swap', 'swap-horizontal')} />
       <Tabs.Screen name="activity" options={tab('Activity', 'time')} />
       <Tabs.Screen name="settings" options={tab('Settings', 'settings')} />
     </Tabs>
