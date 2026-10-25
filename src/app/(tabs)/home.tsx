@@ -1,9 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fmt } from '@/components/activity-row';
-import { QrCode } from '@/components/qr';
 import { ErrorText, Icon, List, Row, Screen, s, type IconName } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, network } from '@/lib/chain';
@@ -18,7 +17,6 @@ export default function Home() {
   const [st, setSt] = useState<Status>();
   const [error, setError] = useState('');
   const [address, setAddress] = useState('');
-  const [showQr, setShowQr] = useState(false);
   const [space, setSpace] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -78,28 +76,17 @@ export default function Home() {
       )}
 
       <View style={[s.card, { gap: 6, padding: Spacing.xl, borderRadius: Radius.xl, backgroundColor: Colors.primary, borderColor: Colors.primary }]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Balance</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Show address as QR code" hitSlop={12} onPress={() => setShowQr(true)}>
-            <Icon name="qr-code-outline" color={Colors.white} />
-          </Pressable>
-        </View>
+        <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Balance</Text>
         <Text style={[Type.num, { fontSize: 44, color: Colors.white }]}>
           {xlm === undefined ? '…' : fmt(xlm)} <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.75)' }}>XLM</Text>
         </Text>
-        {!!address && <Text style={[styles.chip, { alignSelf: 'flex-start', marginTop: Spacing.sm }]}>{address.slice(0, 4)}…{address.slice(-4)}</Text>}
+        {!!address && (
+          <Pressable accessibilityRole="button" accessibilityLabel="Show your address and QR code" onPress={() => router.push('/receive')} style={({ pressed }) => [styles.chip, pressed && { opacity: 0.6 }]}>
+            <Text style={styles.chipText}>{address.slice(0, 4)}…{address.slice(-4)}</Text>
+            <Icon name="qr-code-outline" color={Colors.white} size={16} />
+          </Pressable>
+        )}
       </View>
-
-      <Modal visible={showQr && !!address} transparent animationType="fade" onRequestClose={() => setShowQr(false)}>
-        <Pressable accessibilityLabel="Close" onPress={() => setShowQr(false)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: Spacing.xl }}>
-          <View style={[s.card, { alignItems: 'center', gap: Spacing.lg, padding: Spacing.xl }]}>
-            <Text style={Type.title}>Your address</Text>
-            <QrCode value={address} size={240} />
-            <Text selectable style={[Type.mono, { textAlign: 'center' }]}>{address}</Text>
-            <Text style={Type.small}>Tap anywhere to close</Text>
-          </View>
-        </Pressable>
-      </Modal>
 
       <View style={{ flexDirection: 'row' }}>
         <Action icon="arrow-up" label="Send" disabled={!xlm} onPress={() => router.push('/send')} />
@@ -152,6 +139,7 @@ function Action({ icon, label, disabled, onPress }: { icon: IconName; label: str
 }
 
 const styles = StyleSheet.create({
-  chip: { fontSize: 12, fontFamily: 'monospace', color: Colors.white, backgroundColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full, overflow: 'hidden' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, alignSelf: 'flex-start', marginTop: Spacing.sm, backgroundColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radius.full },
+  chipText: { fontSize: 13, fontFamily: 'monospace', color: Colors.white },
   action: { width: 52, height: 52, borderRadius: Radius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
 });
