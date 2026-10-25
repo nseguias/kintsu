@@ -2,14 +2,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { fmt } from '@/components/activity-row';
+import { fmt, money } from '@/components/activity-row';
 import { ErrorText, Icon, List, Row, Screen, s, type IconName } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
-import { accountExists, network } from '@/lib/chain';
+import { accountExists, network, type Currency } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
-import { getBackups, getHoldings, getTestXlm, getWallet, keepProtection, type Holding } from '@/lib/stellar';
+import { getBackups, getCurrency, getHoldings, getTestXlm, getWallet, keepProtection, valuesIn, type Holding } from '@/lib/stellar';
 
-type Status = { holdings: Holding[]; opened: boolean; backedUp: boolean };
+type Status = { holdings: Holding[]; values: (number | null)[]; currency: Currency; opened: boolean; backedUp: boolean };
 const ROW = 72; // every row in the Home list is this tall, so we can show only the ones that fit whole
 
 export default function Home() {
@@ -26,10 +26,11 @@ export default function Home() {
       const w = (await getWallet())!;
       setAddress(w.account);
       await keepProtection(); // after a restore of a protected wallet: lock the old phone out
-      const [holdings, opened] = await Promise.all([getHoldings(), accountExists(w.account)]);
-      setSt({ holdings, opened, backedUp });
+      const [holdings, opened, currency] = await Promise.all([getHoldings(), accountExists(w.account), getCurrency()]);
+      const values = await valuesIn(holdings, currency);
+      setSt({ holdings, values, currency, opened, backedUp });
     } catch (e) {
-      setSt((old) => old ?? { holdings: [], opened: true, backedUp });
+      setSt((old) => old ?? { holdings: [], values: [], currency: 'USD', opened: true, backedUp });
       setError(String(e).includes('Network') ? 'Can’t reach Stellar. Check your connection and pull down to refresh.' : String(e));
     }
   }, []);
@@ -39,14 +40,16 @@ export default function Home() {
 
   const xlm = st?.holdings[0]?.amount;
   // tokens at 0 stay listed under Tokens (See all / Add token), not here; XLM always shows
-  const rows = (st?.holdings ?? []).filter((h) => !h.token || h.amount > 0).map((h) => (
+  const total = st?.values.reduce<number>((sum, v) => sum + (v ?? 0), 0);
+  const unpriced = st?.holdings.filter((h, i) => st.values[i] === null).map((h) => h.token?.code ?? 'XLM') ?? [];
+  const rows = (st?.holdings ?? []).flatMap((h, i) => (!h.token || h.amount > 0 ? [{ h, value: st!.values[i] }] : [])).map(({ h, value }) => (
     <Row
       key={h.token ? `${h.token.code}:${h.token.issuer}` : 'XLM'}
       oneLine
       badge={h.token ? h.token.code[0] : 'X'}
       title={h.token?.code ?? 'XLM'}
-      detail={h.token?.name ?? 'Stellar Lumens'}
-      right={fmt(h.amount)}
+      detail={value !== null && st!.currency !== (h.token?.code ?? 'XLM') ? money(value, st!.currency) : (h.token?.name ?? 'Stellar Lumens')}
+      right={`${fmt(h.amount)} ${h.token?.code ?? 'XLM'}`}
     />
   ));
   // whole rows only: when they don't all fit, the last slot becomes "See all"
@@ -77,13 +80,19 @@ export default function Home() {
       )}
 
       <View style={[s.card, { gap: 6, padding: Spacing.xl, borderRadius: Radius.xl, backgroundColor: Colors.primary, borderColor: Colors.primary }]}>
-        <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Balance</Text>
-        <Text style={[Type.num, { fontSize: 44, color: Colors.white }]}>
-          {xlm === undefined ? '…' : fmt(xlm)} <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.75)' }}>XLM</Text>
+        <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Total balance</Text>
+        <Text style={[Type.num, { fontSize: 44, color: Colors.white }]} adjustsFontSizeToFit numberOfLines={1}>
+          {st && total !== undefined ? money(total, st.currency) : '…'}
         </Text>
+        {network === 'testnet' && st?.currency !== 'XLM' && (
+          <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Testnet: play prices, worth nothing</Text>
+        )}
+        {!!unpriced.length && (
+          <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Not counting {unpriced.join(', ')}: no price on Stellar right now</Text>
+        )}
         {!!address && (
           <View style={styles.chip}>
-            <Text style={styles.chipText}>{address.slice(0, 4)}…{address.slice(-4)}</Text>
+            <Text style={styles.chipText}>{address.slice(0, 6)}…{address.slice(-6)}</Text>
           </View>
         )}
       </View>

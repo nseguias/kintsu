@@ -4,9 +4,9 @@ import { Alert, Text } from 'react-native';
 
 import { ErrorText, List, Row, Screen, Segmented, s } from '@/components/ui';
 import { Type } from '@/constants/theme';
-import { network, type Network } from '@/lib/chain';
+import { network, type Currency, type Network } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
-import { BACKUP_LABEL, forgetWallet, getBackups, getWallet, isProtected, setNetwork, type BackupRecord } from '@/lib/stellar';
+import { BACKUP_LABEL, forgetWallet, getBackups, getCurrency, getWallet, isProtected, setCurrency, setNetwork, type BackupRecord } from '@/lib/stellar';
 
 export default function Settings() {
   const router = useRouter();
@@ -14,10 +14,12 @@ export default function Settings() {
   const [protectedNow, setProtectedNow] = useState(false);
   const [net, setNet] = useState<Network>(network);
   const [error, setError] = useState('');
+  const [currency, setCur] = useState<Currency>('USD');
 
   useFocusEffect(
     useCallback(() => {
       getBackups().then(setBackups);
+      getCurrency().then(setCur);
       getWallet().then((w) => {
         setProtectedNow(!!w && isProtected(w));
         setNet(network);
@@ -84,6 +86,10 @@ export default function Settings() {
           : 'Same address on both networks, with a separate balance on each. Testnet XLM is free and worthless, for trying things out.'}
       </Text>
       <ErrorText>{error}</ErrorText>
+
+      <Text style={s.label}>SHOW TOTALS IN</Text>
+      <Segmented options={[{ label: 'USD', value: 'USD' }, { label: 'EUR', value: 'EUR' }, { label: 'XLM', value: 'XLM' }]} value={currency} onChange={(c) => setCurrency(c).then(() => setCur(c))} />
+      <Text style={Type.small}>Prices come from Stellar’s own exchange{net === 'testnet' ? '; on testnet they’re play prices' : ''}.</Text>
 
       <List label="THIS PHONE">
         <Row icon="trash-outline" tone="negative" title="Remove wallet" detail="Then create a new one or bring back another" onPress={remove} />

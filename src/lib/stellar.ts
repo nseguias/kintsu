@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { Transaction } from '@stellar/stellar-sdk';
 
-import { accountExists, configure, cosignersOf, horizonUrl, isConfigured, knownTokens, needs2fa, network, server, signersOf, selectNetwork, submit, type Network, type Token } from '@/lib/chain';
+import { accountExists, configure, cosignersOf, horizonUrl, isConfigured, knownTokens, needs2fa, network, priceIn, server, signersOf, selectNetwork, submit, type Currency, type Network, type Token } from '@/lib/chain';
 import { signWithYubiKey } from '@/lib/yubikey';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until protected, then its device key
@@ -11,6 +11,7 @@ const ACCOUNT_KEY = 'wallet.account'; // the G… address, which is always the r
 const PENDING_KEY = 'wallet.pendingDevice';
 const BACKUPS_KEY = 'wallet.backups';
 const NETWORK_KEY = 'wallet.network'; // testnet unless changed in Settings
+const CURRENCY_KEY = 'wallet.currency'; // what totals are shown in; USD unless changed in Settings
 
 export type Wallet = { account: string; signer: Keypair };
 let wallet: Promise<Wallet | null> | undefined;
@@ -170,4 +171,18 @@ export async function getHoldings(): Promise<Holding[]> {
       : [],
   );
   return [{ amount: xlm }, ...tokens];
+}
+
+export const getCurrency = async () => ((await SecureStore.getItemAsync(CURRENCY_KEY)) as Currency | null) ?? 'USD';
+export const setCurrency = (c: Currency) => SecureStore.setItemAsync(CURRENCY_KEY, c);
+
+/** Each holding's worth in `currency` (null: no price on the exchange right now). */
+export async function valuesIn(holdings: Holding[], currency: Currency): Promise<(number | null)[]> {
+  return Promise.all(
+    holdings.map(async (h) => {
+      if (h.amount === 0) return 0;
+      const price = await priceIn(h.token, currency).catch(() => null);
+      return price === null ? null : h.amount * price;
+    }),
+  );
 }

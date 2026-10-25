@@ -2,10 +2,13 @@ import React from 'react';
 import { Linking } from 'react-native';
 
 import { Row } from '@/components/ui';
-import { explorerUrl, type Activity } from '@/lib/chain';
+import { explorerUrl, type Activity, type Currency } from '@/lib/chain';
 
 export const fmt = (n: number | string) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
-const short = (g: string) => `${g.slice(0, 4)}…${g.slice(-4)}`;
+/** An amount in the user's currency: "$1,234.50", "€12.00" or "10,000 XLM". */
+export const money = (n: number, c: Currency) =>
+  c === 'XLM' ? `${fmt(n)} XLM` : n.toLocaleString(undefined, { style: 'currency', currency: c, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const short = (g: string) => `${g.slice(0, 6)}…${g.slice(-6)}`;
 
 /** One payment in or out; tapping opens it on stellar.expert. */
 export function ActivityRow({ a }: { a: Activity }) {

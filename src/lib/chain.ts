@@ -151,6 +151,37 @@ export const knownTokens = () => TOKENS[network];
 export const horizonUrl = () => NETWORKS[network].horizon;
 const assetOf = (t?: Token) => (t ? new Asset(t.code, t.issuer) : Asset.native());
 
+export type Currency = 'USD' | 'EUR' | 'XLM';
+// each currency is priced in the stablecoin that tracks it (XLM: itself)
+const PEG: Record<Currency, string | undefined> = { USD: 'USDC', EUR: 'EURC', XLM: undefined };
+
+const assetParam = (prefix: string, t?: Token) =>
+  t ? `${prefix}_asset_type=credit_alphanum${t.code.length > 4 ? 12 : 4}&${prefix}_asset_code=${t.code}&${prefix}_asset_issuer=${t.issuer}` : `${prefix}_asset_type=native`;
+
+/** What `amount` of `from` buys of `to` on Stellar's exchange right now (best path), or null. */
+async function quote(from: Token | undefined, to: Token | undefined, amount: number): Promise<number | null> {
+  const res = await fetch(`${horizonUrl()}/paths/strict-send?${assetParam('source', from)}&source_amount=${amount.toFixed(7)}&destination_assets=${to ? `${to.code}:${to.issuer}` : 'native'}`);
+  if (!res.ok) return null;
+  const best = (await res.json())._embedded?.records?.[0];
+  return best ? Number(best.destination_amount) : null;
+}
+
+/**
+ * What 1 unit of `from` is worth in `currency`, from Stellar's exchange; the stablecoin itself counts as
+ * exactly 1. Null when there's no real market: selling back what 1 unit buys must return ≥95% of it,
+ * otherwise one stray offer in an empty order book would set the price.
+ * ponytail: a 1-unit quote is the spot price; big balances would fetch less (slippage), fine for a total.
+ */
+export async function priceIn(from: Token | undefined, currency: Currency): Promise<number | null> {
+  const peg = PEG[currency];
+  const to = peg ? knownTokens().find((t) => t.code === peg) : undefined;
+  if (from?.issuer === to?.issuer && from?.code === to?.code) return 1;
+  const price = await quote(from, to, 1);
+  if (!price) return null;
+  const back = await quote(to, from, price);
+  return back !== null && back >= 0.95 ? price : null;
+}
+
 /** What the account holds of a known token: null if it hasn't added it (no trustline). */
 export async function tokenBalance(address: string, t: Token): Promise<number | null> {
   try {
