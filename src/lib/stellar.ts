@@ -1,7 +1,10 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import * as SecureStore from 'expo-secure-store';
 
-import { accountExists, configure, cosignersOf, isConfigured, network, server, signersOf, selectNetwork, type Network } from '@/lib/chain';
+import type { Transaction } from '@stellar/stellar-sdk';
+
+import { accountExists, configure, cosignersOf, isConfigured, knownTokens, needs2fa, network, server, signersOf, selectNetwork, submit, tokenBalance, type Network, type Token } from '@/lib/chain';
+import { signWithYubiKey } from '@/lib/yubikey';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until protected, then its device key
 const ACCOUNT_KEY = 'wallet.account'; // the G… address, which is always the recovery key's
@@ -121,4 +124,36 @@ export async function getXlmBalance(): Promise<number> {
   const address = (await requireWallet()).account;
   if (!(await accountExists(address))) return 0;
   return Number((await server.getAccountEntry(address)).balance) / 1e7; // stroops → XLM; fine for display
+}
+
+/** Whether this wallet's payments (and token changes) need a YubiKey tap right now. */
+export async function needsYubiKey(): Promise<boolean> {
+  const w = await requireWallet();
+  return (await accountExists(w.account)) && needs2fa(await server.getAccountEntry(w.account));
+}
+
+/** Signs with this phone, plus the YubiKey when 2FA is on (`pin` then required), and submits. */
+export async function approve(tx: Transaction, pin?: string, onTap?: () => void): Promise<void> {
+  const w = await requireWallet();
+  const entry = await server.getAccountEntry(w.account);
+  if (needs2fa(entry)) {
+    if (!pin) throw new Error('Needs your YubiKey PIN.');
+    onTap?.();
+    const { address, signature } = await signWithYubiKey(tx.hash(), pin);
+    if (!cosignersOf(entry).includes(address)) throw new Error('That YubiKey isn’t one of this wallet’s second factors.');
+    tx.addSignature(address, Buffer.from(signature).toString('base64'));
+  }
+  tx.sign(w.signer);
+  await submit(tx);
+}
+
+export type Holding = { token?: Token; amount: number }; // no token = XLM
+
+/** XLM plus every known token this wallet has added, XLM first. */
+export async function getHoldings(): Promise<Holding[]> {
+  const address = (await requireWallet()).account;
+  if (!(await accountExists(address))) return [{ amount: 0 }];
+  const xlm = Number((await server.getAccountEntry(address)).balance) / 1e7;
+  const tokens = await Promise.all(knownTokens().map(async (token) => ({ token, amount: await tokenBalance(address, token) })));
+  return [{ amount: xlm }, ...tokens.flatMap(({ token, amount }) => (amount === null ? [] : [{ token, amount }]))];
 }

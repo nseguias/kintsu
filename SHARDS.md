@@ -64,6 +64,11 @@ fp = SHA-256(ed25519 public key)[0..4]
 - **Restore of a protected wallet** re-protects at once (`keepProtection` on Home): the old phone (weight 2) is removed, factors (weight 1) kept.
 - **Adding a backup on a protected phone:** 2 tags + PIN (or the paper, typed offline) bring the recovery key back in memory for that one backup; the phone keeps only its own key. The 12/24 words can't be re-made from the key, so new backups are tags or the S… key.
 
+## Home, tokens, history
+- Home (no tab bar, per the UX review): backup warning only while there's no backup, balance with Send/Receive, TOKENS (XLM + added tokens, "Add a token"), RECENT ACTIVITY (5 rows, "See all"). Protection lives in Settings; a shield next to the gear shows it's on.
+- Tokens = code + issuer; only Circle's USDC and EURC (issuers checked against Circle's docs) are offered. Adding one is a trustline (0.5 XLM reserve) and is approved like a payment (phone, + YubiKey with 2FA). Tokens only go to accounts that added them.
+- History reads Horizon (RPC has no per-account history); rows open stellar.expert.
+
 ## Networks
 - Same address on testnet and mainnet (it's just the public key), separate balance and on-chain keys on each. Testnet by default; Settings switches. A protected phone stays on the network it's protected on.
 - Same behaviour on both: a new wallet is empty until its first deposit opens the account. Testnet adds a "Get 10,000 test XLM" button (Friendbot) instead of opening it silently.

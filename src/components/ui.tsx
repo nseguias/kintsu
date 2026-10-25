@@ -66,16 +66,21 @@ export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export const Icon = ({ name, color = Colors.ink, size = 22 }: { name: IconName; color?: string; size?: number }) => <Ionicons name={name} color={color} size={size} />;
 
 /** One line in a list card: icon, title, optional detail, and a chevron when it opens something. */
-export function Row({ icon, title, detail, right, tone, onPress }: { icon?: IconName; title: string; detail?: string; right?: string; tone?: 'positive' | 'negative' | 'accent'; onPress?: () => void }) {
+export function Row({ icon, badge, title, detail, right, rightTone, tone, onPress }: { icon?: IconName; badge?: string; title: string; detail?: string; right?: string; rightTone?: 'positive'; tone?: 'positive' | 'negative' | 'accent'; onPress?: () => void }) {
   const color = tone ? Colors[tone] : Colors.ink;
   return (
     <Pressable accessibilityRole={onPress ? 'button' : undefined} disabled={!onPress} onPress={onPress} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}>
       {icon && <Icon name={icon} color={tone ? color : Colors.primary} />}
+      {!!badge && (
+        <View style={{ width: 32, height: 32, borderRadius: Radius.full, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontWeight: '700', color: Colors.primary }}>{badge}</Text>
+        </View>
+      )}
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[Type.heading, tone === 'negative' && { color }]}>{title}</Text>
         {!!detail && <Text style={Type.small}>{detail}</Text>}
       </View>
-      {!!right && <Text style={Type.small}>{right}</Text>}
+      {!!right && <Text style={[Type.body, rightTone && { color: Colors[rightTone] }]}>{right}</Text>}
       {onPress && <Icon name="chevron-forward" color={Colors.inkFaint} size={18} />}
     </Pressable>
   );

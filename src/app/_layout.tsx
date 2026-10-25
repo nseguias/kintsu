@@ -34,6 +34,8 @@ export default function RootLayout() {
         <Stack.Screen name="restore" options={{ title: 'NFC tags' }} />
         <Stack.Screen name="send" options={{ title: 'Send XLM' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive' }} />
+        <Stack.Screen name="tokens" options={{ title: 'Add a token' }} />
+        <Stack.Screen name="activity" options={{ title: 'Activity' }} />
         <Stack.Screen name="protect" options={{ title: 'Protection' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="home" options={{ headerShown: false }} />

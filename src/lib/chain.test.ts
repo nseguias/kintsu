@@ -1,7 +1,7 @@
 import { Keypair, Operation } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { configure, cosignersOf, isConfigured, needs2fa, newTx, server, signersOf, submit } from './chain';
+import { addTokenTx, configure, cosignersOf, isConfigured, knownTokens, needs2fa, newTx, server, signersOf, submit, tokenBalance } from './chain';
 
 // what protecting a (new) phone does: this phone in, every other phone out, second factors kept
 const rekey = async (recovery: Keypair, device: string) =>
@@ -78,4 +78,15 @@ describe.skipIf(!process.env.TESTNET)('keys on testnet', () => {
     expect(needs2fa(entry)).toBe(false);
     await pay(account, phone2);
   }, 180_000);
+
+  it('tokens: not added → null, added → 0', async () => {
+    const owner = Keypair.random();
+    await server.fundAddress(owner.publicKey());
+    const usdc = knownTokens()[0];
+    expect(await tokenBalance(owner.publicKey(), usdc)).toBeNull();
+    const tx = await addTokenTx(owner.publicKey(), usdc);
+    tx.sign(owner);
+    await submit(tx);
+    expect(await tokenBalance(owner.publicKey(), usdc)).toBe(0);
+  }, 60_000);
 });

@@ -4,11 +4,10 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, s } from '@/components/ui';
+import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, Segmented, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
-import { accountExists, cosignersOf, needs2fa, parsePaymentQr, paymentTx, server, spendable, submit } from '@/lib/chain';
-import { getWallet } from '@/lib/stellar';
-import { signWithYubiKey } from '@/lib/yubikey';
+import { accountExists, needs2fa, parsePaymentQr, paymentTx, server, spendable } from '@/lib/chain';
+import { approve, getHoldings, getWallet, type Holding } from '@/lib/stellar';
 
 const AMOUNT = /^\d+(\.\d{1,7})?$/; // Stellar amounts have 7 decimals
 const memoBytes = (m: string) => new TextEncoder().encode(m).length;
@@ -16,11 +15,13 @@ const memoBytes = (m: string) => new TextEncoder().encode(m).length;
 export default function Send() {
   const router = useRouter();
   const [account, setAccount] = useState('');
-  const [max, setMax] = useState<number>();
+  const [xlmMax, setXlmMax] = useState<number>();
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [code, setCode] = useState('XLM');
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [memo, setMemo] = useState('');
-  const [review, setReview] = useState<{ tx: Transaction; creates: boolean; factors: string[] }>();
+  const [review, setReview] = useState<{ tx: Transaction; creates: boolean; yubikey: boolean }>();
   const [pin, setPin] = useState('');
   const [askPin, setAskPin] = useState(false);
   const [busy, setBusy] = useState('');
@@ -33,16 +34,20 @@ export default function Send() {
   useEffect(() => {
     getWallet().then(async (w) => {
       setAccount(w!.account);
-      setMax(spendable(await server.getAccountEntry(w!.account)));
+      setXlmMax(spendable(await server.getAccountEntry(w!.account)));
+      setHoldings(await getHoldings());
     }, (e) => setError(String(e)));
   }, []);
+
+  const token = holdings.find((h) => h.token?.code === code)?.token;
+  const max = token ? holdings.find((h) => h.token === token)!.amount : xlmMax;
 
   const dest = to.trim().toUpperCase();
   const problem =
     dest && !StrKey.isValidEd25519PublicKey(dest) ? 'That isn’t a Stellar address (G…, 56 characters).'
     : dest === account ? 'That’s this wallet’s own address.'
     : amount && !AMOUNT.test(amount) ? 'Use a number with up to 7 decimals.'
-    : amount && max !== undefined && Number(amount) > max ? `You can send up to ${max.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM.`
+    : amount && max !== undefined && Number(amount) > max ? `You can send up to ${max.toLocaleString(undefined, { maximumFractionDigits: 7 })} ${code}.`
     : memoBytes(memo) > 28 ? 'The memo can be at most 28 characters.'
     : '';
   const ready = !problem && StrKey.isValidEd25519PublicKey(dest) && Number(amount) > 0;
@@ -51,10 +56,10 @@ export default function Send() {
     setError('');
     setBusy('Checking…');
     try {
-      const creates = !(await accountExists(dest));
+      const creates = !token && !(await accountExists(dest));
       if (creates && Number(amount) < 1) throw new Error('That address has no account yet. The first payment to it must be at least 1 XLM.');
       const entry = await server.getAccountEntry(account);
-      setReview({ tx: await paymentTx(account, dest, amount, memo), creates, factors: needs2fa(entry) ? cosignersOf(entry) : [] });
+      setReview({ tx: await paymentTx(account, dest, amount, memo, token), creates, yubikey: needs2fa(entry) });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -65,16 +70,8 @@ export default function Send() {
     setError('');
     setBusy('Sending…');
     try {
-      const { tx, factors } = review!;
-      if (factors.length) {
-        setBusy('Hold your YubiKey flat against the back of your phone');
-        const { address, signature } = await signWithYubiKey(tx.hash(), pin);
-        if (!factors.includes(address)) throw new Error('That YubiKey isn’t one of this wallet’s second factors.');
-        tx.addSignature(address, Buffer.from(signature).toString('base64'));
-        setBusy('Sending…');
-      }
-      tx.sign((await getWallet())!.signer);
-      await submit(tx);
+      const { tx } = review!;
+      await approve(tx, pin, () => setBusy('Hold your YubiKey flat against the back of your phone'));
       setSent(Buffer.from(tx.hash()).toString('hex'));
     } catch (e) {
       // a half-signed transaction can't be retried as is; Review builds a fresh one
@@ -124,7 +121,7 @@ export default function Send() {
       <Screen>
         <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.md }}>
           <Text style={[Type.title, { textAlign: 'center' }]}>Sent ✓</Text>
-          <Text style={[Type.body, { textAlign: 'center' }]}>{amount} XLM is on its way.</Text>
+          <Text style={[Type.body, { textAlign: 'center' }]}>{amount} {code} is on its way.</Text>
           <Text selectable style={[Type.small, { textAlign: 'center' }]}>Transaction {sent.slice(0, 8)}…{sent.slice(-8)}</Text>
         </View>
         <Button title="Done" onPress={() => router.back()} />
@@ -136,7 +133,7 @@ export default function Send() {
     return (
       <Screen>
         <Text style={Type.title}>Your YubiKey PIN</Text>
-        <Intro>Then hold your YubiKey to the back of the phone to approve {amount} XLM.</Intro>
+        <Intro>Then hold your YubiKey to the back of the phone to approve {amount} {code}.</Intro>
         <SecretInput secureTextEntry autoFocus placeholder="YubiKey PIN" value={pin} onChangeText={setPin} />
         <View style={{ flex: 1 }} />
         <Button title="Tap your YubiKey" disabled={pin.length < 6} onPress={send} />
@@ -150,7 +147,7 @@ export default function Send() {
       <Screen>
         <View style={[s.card, { gap: Spacing.sm }]}>
           <Text style={Type.small}>Send</Text>
-          <Text style={[Type.num, { fontSize: 32 }]}>{amount} XLM</Text>
+          <Text style={[Type.num, { fontSize: 32 }]}>{amount} {code}</Text>
           <Text style={Type.small}>To</Text>
           <Text selectable style={Type.mono}>{dest.match(/.{1,4}/g)!.join(' ')}</Text>
           {!!memo && <Text style={Type.small}>Memo: {memo}</Text>}
@@ -160,7 +157,7 @@ export default function Send() {
         <Text style={Type.small}>Check the first and last characters of the address with the receiver.</Text>
         <ErrorText>{error}</ErrorText>
         <View style={{ flex: 1 }} />
-        <Button title={`Send ${amount} XLM`} onPress={review.factors.length ? () => setAskPin(true) : send} />
+        <Button title={`Send ${amount} ${code}`} onPress={review.yubikey ? () => setAskPin(true) : send} />
         <Button kind="link" title="Change" onPress={() => setReview(undefined)} />
       </Screen>
     );
@@ -184,12 +181,18 @@ export default function Send() {
           <Icon name="qr-code-outline" color={Colors.primary} />
         </Pressable>
       </View>
-      <Text style={s.label}>AMOUNT (XLM)</Text>
+      {holdings.length > 1 && (
+        <>
+          <Text style={s.label}>TOKEN</Text>
+          <Segmented options={holdings.map((h) => ({ label: h.token?.code ?? 'XLM', value: h.token?.code ?? 'XLM' }))} value={code} onChange={setCode} />
+        </>
+      )}
+      <Text style={s.label}>AMOUNT ({code})</Text>
       <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
         <TextInput style={[s.input, { flex: 1 }]} value={amount} onChangeText={setAmount} placeholder="0" keyboardType="decimal-pad" />
         {max !== undefined && <Button kind="link" title="Max" onPress={() => setAmount(String(Math.floor(max * 1e7) / 1e7))} />}
       </View>
-      {max !== undefined && <Text style={Type.small}>Available: {max.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM</Text>}
+      {max !== undefined && <Text style={Type.small}>Available: {max.toLocaleString(undefined, { maximumFractionDigits: 7 })} {code}</Text>}
       <Text style={s.label}>MEMO (OPTIONAL)</Text>
       <TextInput style={s.input} value={memo} onChangeText={setMemo} placeholder="Exchanges often require one" />
       <ErrorText>{problem || error}</ErrorText>

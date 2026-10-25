@@ -4,8 +4,8 @@ import { Asset, Keypair, Memo, Networks, Operation, rpc, StrKey, TransactionBuil
 export type Network = 'testnet' | 'mainnet';
 // ponytail: SDF runs no public mainnet RPC; Gateway's is free and keyless. Swap for a paid provider if it rate-limits.
 const NETWORKS = {
-  testnet: { passphrase: Networks.TESTNET, rpc: 'https://soroban-testnet.stellar.org' },
-  mainnet: { passphrase: Networks.PUBLIC, rpc: 'https://soroban-rpc.mainnet.stellar.gateway.fm' },
+  testnet: { passphrase: Networks.TESTNET, rpc: 'https://soroban-testnet.stellar.org', horizon: 'https://horizon-testnet.stellar.org' },
+  mainnet: { passphrase: Networks.PUBLIC, rpc: 'https://soroban-rpc.mainnet.stellar.gateway.fm', horizon: 'https://horizon.stellar.org' },
 } as const;
 
 // live bindings: importers always see the current network
@@ -57,11 +57,16 @@ export function spendable(entry: xdr.AccountEntry): number {
   return Math.max(0, Number(entry.balance) / 1e7 - (2 + entry.numSubEntries) * 0.5 - 0.001);
 }
 
-/** An unsigned XLM payment. Creates the recipient's account if it doesn't exist yet (needs ≥ 1 XLM). */
-export async function paymentTx(from: string, to: string, amount: string, memo = ''): Promise<Transaction> {
+/**
+ * An unsigned payment of XLM, or of `token`. XLM to a new address creates its account (needs ≥ 1 XLM);
+ * a token can only go to an account that has added it.
+ */
+export async function paymentTx(from: string, to: string, amount: string, memo = '', token?: Token): Promise<Transaction> {
+  const exists = await accountExists(to);
+  if (token && (!exists || (await tokenBalance(to, token)) === null)) throw new Error(`That address hasn’t added ${token.code} yet, so it can’t receive it.`);
   const tx = (await newTx(from)).addOperation(
-    (await accountExists(to))
-      ? Operation.payment({ destination: to, asset: Asset.native(), amount })
+    exists || token
+      ? Operation.payment({ destination: to, asset: assetOf(token), amount })
       : Operation.createAccount({ destination: to, startingBalance: amount }),
   );
   if (memo) tx.addMemo(Memo.text(memo));
@@ -123,8 +128,41 @@ export async function configure(recovery: Keypair, device: string, cosigners: st
   await submit(built);
 }
 
-/** XLM the account must hold for a phone key plus `cosigners` factors: 0.5 per entry (2 base, 1 per key) and a fee. */
-export const protectionMinimum = (cosigners: number) => (2 + 1 + cosigners) * 0.5 + 0.01;
+/** XLM the account must hold for a phone key plus `cosigners` factors: 0.5 per entry (2 base, tokens, 1 per key) and a fee. */
+export const protectionMinimum = (entry: xdr.AccountEntry | null, cosigners: number) =>
+  (2 + (entry ? entry.numSubEntries - signersOf(entry).length : 0) + 1 + cosigners) * 0.5 + 0.01;
+
+/**
+ * Tokens Shards offers. On Stellar anyone can issue a token called "USDC", so a token is code +
+ * issuer, and we only list issuers we checked (Circle's docs, 2026-10-25).
+ */
+export type Token = { code: string; issuer: string; name: string };
+const TOKENS: Record<Network, Token[]> = {
+  testnet: [
+    { code: 'USDC', issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5', name: 'USD Coin' },
+    { code: 'EURC', issuer: 'GB3Q6QDZYTHWT7E5PVS3W7FUT5GVAFC5KSZFFLPU25GO7VTC3NM2ZTVO', name: 'Euro Coin' },
+  ],
+  mainnet: [
+    { code: 'USDC', issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN', name: 'USD Coin' },
+    { code: 'EURC', issuer: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2', name: 'Euro Coin' },
+  ],
+};
+export const knownTokens = () => TOKENS[network];
+const assetOf = (t?: Token) => (t ? new Asset(t.code, t.issuer) : Asset.native());
+
+/** What the account holds of a known token: null if it hasn't added it (no trustline). */
+export async function tokenBalance(address: string, t: Token): Promise<number | null> {
+  try {
+    const { balanceEntry } = await server.getAssetBalance(address, assetOf(t), NETWORK_PASSPHRASE);
+    return balanceEntry ? Number(balanceEntry.amount) / 1e7 : null;
+  } catch (e) {
+    if (String(e).includes('not found')) return null; // the SDK throws for a missing trustline
+    throw e; // network trouble: don't act on a guess
+  }
+}
+
+/** Adding a token = a trustline: the account agrees to hold it. Locks 0.5 XLM. */
+export const addTokenTx = async (account: string, t: Token) => (await newTx(account)).addOperation(Operation.changeTrust({ asset: assetOf(t) })).build();
 
 export type PaymentRequest = { to: string; amount?: string; memo?: string };
 
@@ -147,3 +185,32 @@ export function parsePaymentQr(text: string): PaymentRequest | null {
 
 /** SEP-7 link other wallets understand; what Receive shows as a QR. */
 export const paymentUri = (to: string) => `web+stellar:pay?destination=${to}`;
+
+export type Activity = { id: string; incoming: boolean; other: string; amount: string; code: string; at: string; tx: string };
+
+/** Horizon payment records (payment, create_account, path payments) → what History shows. Others are skipped. */
+export function toActivity(me: string, records: Record<string, string>[]): Activity[] {
+  return records.flatMap((r) => {
+    const base = { id: r.id, at: r.created_at, tx: r.transaction_hash };
+    if (r.type === 'create_account') {
+      const incoming = r.account === me;
+      return [{ ...base, incoming, other: incoming ? r.funder : r.account, amount: r.starting_balance, code: 'XLM' }];
+    }
+    if (r.type === 'payment' || r.type.startsWith('path_payment')) {
+      const incoming = r.to === me;
+      return [{ ...base, incoming, other: incoming ? r.from : r.to, amount: r.amount, code: r.asset_type === 'native' ? 'XLM' : r.asset_code }];
+    }
+    return [];
+  });
+}
+
+/** Latest payments in and out of `address`, newest first. RPC has no per-account history, so this reads Horizon. */
+export async function recentActivity(address: string, limit = 5): Promise<Activity[]> {
+  const res = await fetch(`${NETWORKS[network].horizon}/accounts/${address}/payments?order=desc&limit=${limit}`);
+  if (res.status === 404) return []; // account not opened yet
+  if (!res.ok) throw new Error(`History unavailable (${res.status})`);
+  return toActivity(address, (await res.json())._embedded.records);
+}
+
+/** Where a transaction can be inspected publicly. */
+export const explorerUrl = (tx: string) => `https://stellar.expert/explorer/${network === 'mainnet' ? 'public' : 'testnet'}/tx/${tx}`;

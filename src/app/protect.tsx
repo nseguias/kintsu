@@ -113,7 +113,7 @@ export default function Protect() {
     );
   }
 
-  const need = protectionMinimum(factors.length + (protectedNow ? 1 : Number(withYubiKey)));
+  const need = protectionMinimum(entry, factors.length + (protectedNow ? 1 : Number(withYubiKey)));
   const short = balance < need;
   const fund = short && (
     <View style={{ gap: Spacing.sm }}>
