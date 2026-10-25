@@ -39,7 +39,11 @@ export default function BackupChoice() {
       />
       <View style={{ flex: 1 }} />
       <Button title={n ? `Back up with ${n} method${n > 1 ? 's' : ''}` : 'Pick at least one'} disabled={!n} onPress={go} />
-      <Button kind="link" title={d.imported ? 'Skip, my paper is enough' : 'Skip for now (not safe)'} onPress={() => nextBackup(router)} />
+      {d.onlyBackups ? (
+        <Button kind="link" title="Cancel" onPress={() => router.back()} />
+      ) : (
+        <Button kind="link" title={d.imported ? 'Skip, my paper is enough' : 'Skip for now (not safe)'} onPress={() => nextBackup(router)} />
+      )}
     </Screen>
   );
 }

@@ -1,12 +1,13 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import * as SecureStore from 'expo-secure-store';
 
-import { accountExists, configure, cosignersOf, isConfigured, server, signersOf } from '@/lib/chain';
+import { accountExists, configure, cosignersOf, isConfigured, network, server, signersOf, selectNetwork, type Network } from '@/lib/chain';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until protected, then its device key
 const ACCOUNT_KEY = 'wallet.account'; // the G… address, which is always the recovery key's
 const PENDING_KEY = 'wallet.pendingDevice';
 const BACKUPS_KEY = 'wallet.backups';
+const NETWORK_KEY = 'wallet.network'; // testnet unless changed in Settings
 
 export type Wallet = { account: string; signer: Keypair };
 let wallet: Promise<Wallet | null> | undefined;
@@ -17,6 +18,7 @@ export function getWallet(): Promise<Wallet | null> {
     const secret = await SecureStore.getItemAsync(SIGNER_KEY);
     if (!secret) return null;
     const signer = Keypair.fromSecret(secret);
+    selectNetwork(((await SecureStore.getItemAsync(NETWORK_KEY)) as Network | null) ?? 'testnet');
     return { account: (await SecureStore.getItemAsync(ACCOUNT_KEY)) ?? signer.publicKey(), signer };
   })();
   wallet.catch(() => (wallet = undefined)); // let a later call retry
@@ -34,9 +36,9 @@ async function requireWallet(): Promise<Wallet> {
 
 /** Removes the wallet from this phone. Only its backups can bring it back. */
 export async function forgetWallet(): Promise<void> {
-  for (const k of [SIGNER_KEY, ACCOUNT_KEY, PENDING_KEY, BACKUPS_KEY]) await SecureStore.deleteItemAsync(k);
+  for (const k of [SIGNER_KEY, ACCOUNT_KEY, PENDING_KEY, BACKUPS_KEY, NETWORK_KEY]) await SecureStore.deleteItemAsync(k);
   wallet = undefined;
-  funded = undefined;
+  selectNetwork('testnet');
 }
 
 /** Stores the recovery key (created, imported or restored). The phone can do everything until protected. */
@@ -46,7 +48,17 @@ export async function saveWallet(seed: Uint8Array): Promise<void> {
   await SecureStore.setItemAsync(SIGNER_KEY, kp.secret());
   await SecureStore.deleteItemAsync(PENDING_KEY);
   wallet = Promise.resolve({ account: kp.publicKey(), signer: kp });
-  funded = undefined;
+}
+
+/**
+ * Same address on both networks, but each network has its own balance and its own on-chain keys.
+ * A protected phone only holds the key that network trusts, so its network is fixed.
+ */
+export async function setNetwork(n: Network): Promise<void> {
+  const w = await requireWallet();
+  if (n !== network && isProtected(w)) throw new Error(`This phone is protected on ${network}, so it stays there.`);
+  await SecureStore.setItemAsync(NETWORK_KEY, n);
+  selectNetwork(n);
 }
 
 let protecting: Promise<void> | undefined;
@@ -98,21 +110,15 @@ export async function getBackups(): Promise<BackupRecord[]> {
   return JSON.parse((await SecureStore.getItemAsync(BACKUPS_KEY)) ?? '[]');
 }
 
-let funded: Promise<void> | undefined;
-
-/** Friendbot-funds the account the first time it is seen on testnet. */
-export function ensureFunded(): Promise<void> {
-  funded ??= (async () => {
-    const address = (await requireWallet()).account;
-    if (!(await accountExists(address))) await server.fundAddress(address);
-  })();
-  funded.catch(() => (funded = undefined));
-  return funded;
+/** Testnet only: Friendbot opens the account with 10,000 test XLM. It only funds new accounts. */
+export async function getTestXlm(): Promise<void> {
+  if (network !== 'testnet') throw new Error('Test XLM is only for testnet.');
+  await server.fundAddress((await requireWallet()).account);
 }
 
-/** Native balance in XLM, read over RPC. */
+/** Native balance in XLM, read over RPC; 0 until the account's first deposit (it doesn't exist before). */
 export async function getXlmBalance(): Promise<number> {
-  await ensureFunded();
-  const entry = await server.getAccountEntry((await requireWallet()).account);
-  return Number(entry.balance) / 1e7; // stroops → XLM; fine for display
+  const address = (await requireWallet()).account;
+  if (!(await accountExists(address))) return 0;
+  return Number((await server.getAccountEntry(address)).balance) / 1e7; // stroops → XLM; fine for display
 }

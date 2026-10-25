@@ -2,9 +2,9 @@ import { StrKey, type Transaction } from '@stellar/stellar-sdk';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
-import { Busy, Button, ErrorText, Intro, Screen, SecretInput, s } from '@/components/ui';
+import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, cosignersOf, needs2fa, parsePaymentQr, paymentTx, server, spendable, submit } from '@/lib/chain';
 import { getWallet } from '@/lib/stellar';
@@ -168,9 +168,22 @@ export default function Send() {
 
   return (
     <Screen>
-      <Button kind="secondary" title="Scan QR code" onPress={() => setScanning(true)} />
       <Text style={s.label}>TO</Text>
-      <TextInput style={[s.input, Type.mono]} value={to} onChangeText={setTo} placeholder="G…" autoCapitalize="characters" autoCorrect={false} multiline />
+      <View style={[s.input, { flexDirection: 'row', alignItems: 'center', paddingVertical: 0, paddingRight: 0 }]}>
+        <TextInput
+          style={[Type.mono, { flex: 1, paddingVertical: Spacing.md }]}
+          value={to}
+          onChangeText={setTo}
+          placeholder="G…"
+          placeholderTextColor={Colors.inkFaint}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          multiline
+        />
+        <Pressable accessibilityRole="button" accessibilityLabel="Scan QR code" onPress={() => setScanning(true)} style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="qr-code-outline" color={Colors.primary} />
+        </Pressable>
+      </View>
       <Text style={s.label}>AMOUNT (XLM)</Text>
       <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
         <TextInput style={[s.input, { flex: 1 }]} value={amount} onChangeText={setAmount} placeholder="0" keyboardType="decimal-pad" />

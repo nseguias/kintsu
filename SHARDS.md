@@ -62,7 +62,12 @@ fp = SHA-256(ed25519 public key)[0..4]
   - Changing keys: only the recovery key; phone + every factor is 4 < 5. On a protected phone that means 2 tags + PIN (add a YubiKey, turn 2FA off).
 - `configure(recovery, phone, factors)` sets exactly that state and removes every other signer.
 - **Restore of a protected wallet** re-protects at once (`keepProtection` on Home): the old phone (weight 2) is removed, factors (weight 1) kept.
-- Known limit: a protected phone can't write new backups (it no longer holds the recovery key).
+- **Adding a backup on a protected phone:** 2 tags + PIN (or the paper, typed offline) bring the recovery key back in memory for that one backup; the phone keeps only its own key. The 12/24 words can't be re-made from the key, so new backups are tags or the S… key.
+
+## Networks
+- Same address on testnet and mainnet (it's just the public key), separate balance and on-chain keys on each. Testnet by default; Settings switches. A protected phone stays on the network it's protected on.
+- Same behaviour on both: a new wallet is empty until its first deposit opens the account. Testnet adds a "Get 10,000 test XLM" button (Friendbot) instead of opening it silently.
+- RPC: SDF's testnet RPC; mainnet via Gateway's free public RPC (SDF runs none).
 
 ## YubiKey
 - Only the OpenPGP app's signing slot is used; FIDO (security-key logins), OTP, PIV and OATH are separate apps the commands can't reach.

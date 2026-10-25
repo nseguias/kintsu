@@ -1,9 +1,23 @@
 import { Asset, Keypair, Memo, Networks, Operation, rpc, StrKey, TransactionBuilder, type Transaction, type xdr } from '@stellar/stellar-sdk';
 
-// ponytail: testnet only; mainnet needs real funding instead of Friendbot.
 // No React Native imports here, so chain.test.ts can run it against testnet from Node.
-export const NETWORK_PASSPHRASE = Networks.TESTNET;
-export const server = new rpc.Server('https://soroban-testnet.stellar.org');
+export type Network = 'testnet' | 'mainnet';
+// ponytail: SDF runs no public mainnet RPC; Gateway's is free and keyless. Swap for a paid provider if it rate-limits.
+const NETWORKS = {
+  testnet: { passphrase: Networks.TESTNET, rpc: 'https://soroban-testnet.stellar.org' },
+  mainnet: { passphrase: Networks.PUBLIC, rpc: 'https://soroban-rpc.mainnet.stellar.gateway.fm' },
+} as const;
+
+// live bindings: importers always see the current network
+export let network: Network = 'testnet';
+export let NETWORK_PASSPHRASE: string = NETWORKS.testnet.passphrase;
+export let server = new rpc.Server(NETWORKS.testnet.rpc);
+
+export function selectNetwork(n: Network) {
+  network = n;
+  NETWORK_PASSPHRASE = NETWORKS[n].passphrase;
+  server = new rpc.Server(NETWORKS[n].rpc);
+}
 
 // Weights double as roles: 5 = recovery key (account master), 2 = a phone, 1 = a second factor
 // (YubiKey, later the helper service).

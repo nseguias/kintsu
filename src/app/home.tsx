@@ -4,11 +4,11 @@ import { Pressable, Text, View } from 'react-native';
 
 import { Button, ErrorText, Icon, List, Row, Screen, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
-import { needs2fa, server } from '@/lib/chain';
+import { accountExists, needs2fa, network, server } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
-import { BACKUP_LABEL, getBackups, getWallet, getXlmBalance, isProtected, keepProtection, type BackupRecord } from '@/lib/stellar';
+import { BACKUP_LABEL, getBackups, getTestXlm, getWallet, getXlmBalance, isProtected, keepProtection, type BackupRecord } from '@/lib/stellar';
 
-type Status = { balance?: number; backups: BackupRecord[]; protectedNow: boolean; twoFactor: boolean };
+type Status = { balance?: number; opened?: boolean; backups: BackupRecord[]; protectedNow: boolean; twoFactor: boolean };
 
 export default function Home() {
   const router = useRouter();
@@ -22,7 +22,8 @@ export default function Home() {
       const balance = await getXlmBalance();
       await keepProtection(); // after a restore of a protected wallet: lock the old phone out
       const w = (await getWallet())!;
-      setStatus({ balance, backups, protectedNow: isProtected(w), twoFactor: needs2fa(await server.getAccountEntry(w.account)) });
+      const opened = await accountExists(w.account); // a Stellar account exists from its first deposit
+      setStatus({ balance, opened, backups, protectedNow: isProtected(w), twoFactor: opened && needs2fa(await server.getAccountEntry(w.account)) });
     } catch (e) {
       const w = await getWallet();
       setStatus((st) => st ?? { backups, protectedNow: !!w && isProtected(w), twoFactor: false });
@@ -38,7 +39,16 @@ export default function Home() {
     <Screen noHeader onRefresh={refresh}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
         <Text style={[Type.title, { flex: 1 }]}>Shards</Text>
-        <Text style={[Type.tiny, { backgroundColor: Colors.neutralChip, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full }]}>TESTNET</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Network: ${network}`} onPress={() => router.push('/settings')}>
+          <Text
+            style={[
+              Type.tiny,
+              { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, overflow: 'hidden' },
+              network === 'testnet' ? { backgroundColor: Colors.neutralChip } : { backgroundColor: Colors.primarySoft, color: Colors.primary },
+            ]}>
+            {network.toUpperCase()}
+          </Text>
+        </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Settings" hitSlop={12} onPress={() => router.push('/settings')}>
           <Icon name="settings-outline" />
         </Pressable>
@@ -50,6 +60,11 @@ export default function Home() {
           {st?.balance === undefined ? '…' : st.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
           <Text style={{ fontSize: 20, color: Colors.inkSoft }}>XLM</Text>
         </Text>
+        {st?.opened === false && (
+          <Text style={Type.small}>
+            New wallets start empty. Receive your first XLM to open it on Stellar{network === 'testnet' ? ', or get free test XLM.' : '.'}
+          </Text>
+        )}
         <ErrorText>{error}</ErrorText>
         <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
           <View style={{ flex: 1 }}>
@@ -59,6 +74,9 @@ export default function Home() {
             <Button kind="secondary" title="Receive" onPress={() => router.push('/receive')} />
           </View>
         </View>
+        {st?.opened === false && network === 'testnet' && (
+          <Button kind="link" title="Get 10,000 test XLM" onPress={() => getTestXlm().then(refresh, (e) => setError(String(e)))} />
+        )}
       </View>
 
       {st && (

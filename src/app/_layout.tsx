@@ -24,13 +24,14 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="create" options={{ title: 'Create a wallet' }} />
-        <Stack.Screen name="import" options={{ title: 'Import a wallet' }} />
+        <Stack.Screen name="recover" options={{ title: 'I already have a wallet' }} />
+        <Stack.Screen name="import" options={{ title: 'Type your backup' }} />
         <Stack.Screen name="backup" options={{ title: 'Back up your wallet' }} />
         <Stack.Screen name="backup-phrase" options={{ title: 'Recovery phrase' }} />
         <Stack.Screen name="verify" options={{ title: 'Check your paper' }} />
         <Stack.Screen name="backup-key" options={{ title: 'Secret key' }} />
         <Stack.Screen name="backup-tags" options={{ title: 'NFC tags' }} />
-        <Stack.Screen name="restore" options={{ title: 'Restore from tags' }} />
+        <Stack.Screen name="restore" options={{ title: 'NFC tags' }} />
         <Stack.Screen name="send" options={{ title: 'Send XLM' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive' }} />
         <Stack.Screen name="protect" options={{ title: 'Protection' }} />

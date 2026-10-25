@@ -1,18 +1,21 @@
 import { isValidMnemonic, wordlist } from '@crypto/mnemonic';
 import { Keypair, StrKey } from '@stellar/stellar-sdk';
 import { usePreventScreenCapture } from 'expo-screen-capture';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { Button, OfflineOnly, Screen, Segmented, SecretInput, s } from '@/components/ui';
+import { Button, ErrorText, OfflineOnly, Screen, Segmented, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
-import { startDraft } from '@/lib/draft';
+import { backUpUnlocked, startDraft } from '@/lib/draft';
 
 export default function Import() {
   usePreventScreenCapture();
   const router = useRouter();
-  const [mode, setMode] = useState<'phrase' | 'key'>('phrase');
+  const params = useLocalSearchParams<{ mode?: 'phrase' | 'key'; purpose?: 'backup' }>();
+  const forBackup = params.purpose === 'backup';
+  const [mode, setMode] = useState<'phrase' | 'key'>(params.mode ?? 'phrase');
+  const [error, setError] = useState('');
   const [count, setCount] = useState<12 | 24>(12);
   const [words, setWords] = useState<string[]>(Array(24).fill(''));
   const [pass, setPass] = useState('');
@@ -25,8 +28,9 @@ export default function Import() {
   const keyOk = StrKey.isValidEd25519SecretSeed(secret.trim());
 
   const submit = () => {
-    if (mode === 'phrase') startDraft({ mnemonic: phrase, passphrase: pass, imported: true });
-    else startDraft({ rawSeed: Keypair.fromSecret(secret.trim()).rawSecretKey(), imported: true });
+    const d = mode === 'phrase' ? { mnemonic: phrase, passphrase: pass, imported: true } : { rawSeed: Keypair.fromSecret(secret.trim()).rawSecretKey(), imported: true };
+    if (forBackup) return backUpUnlocked(router, d).catch((e) => setError(e.message));
+    startDraft(d);
     router.push('/backup');
   };
 
@@ -66,8 +70,9 @@ export default function Import() {
             </Text>
           </>
         )}
+        <ErrorText>{error}</ErrorText>
         <View style={{ flex: 1 }} />
-        <Button title="Import" disabled={mode === 'phrase' ? !phraseOk : !keyOk} onPress={submit} />
+        <Button title={forBackup ? 'Unlock' : 'Continue'} disabled={mode === 'phrase' ? !phraseOk : !keyOk} onPress={submit} />
       </OfflineOnly>
     </Screen>
   );
