@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ Fraunces_600SemiBold, Fraunces_700Bold });
@@ -18,7 +18,7 @@ export default function RootLayout() {
           headerShadowVisible: false,
           headerStyle: { backgroundColor: Colors.background },
           headerTintColor: Colors.ink,
-          headerTitleStyle: { fontWeight: '700' },
+          headerTitleStyle: { fontFamily: Fonts.serif, fontSize: 20 },
           contentStyle: { backgroundColor: Colors.background },
         }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -33,9 +33,9 @@ export default function RootLayout() {
         <Stack.Screen name="restore" options={{ title: 'Restore from tags' }} />
         <Stack.Screen name="send" options={{ title: 'Send XLM' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive' }} />
-        <Stack.Screen name="two-factor" options={{ title: 'Two-factor' }} />
+        <Stack.Screen name="protect" options={{ title: 'Protection' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="home" options={{ headerShown: false }} />
-        <Stack.Screen name="nfc-check" options={{ title: 'NFC check' }} />
       </Stack>
     </>
   );

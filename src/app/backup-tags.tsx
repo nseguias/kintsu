@@ -1,9 +1,9 @@
 import { MIN_PIN, createShards } from '@crypto/shards';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { Button, Screen, SecretInput, s } from '@/components/ui';
+import { Busy, Button, ErrorText, Intro, List, Row, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { getDraft, nextBackup, seedOf } from '@/lib/draft';
 import { TagError, cancelTap, writeVerified } from '@/lib/nfc';
@@ -48,38 +48,25 @@ export default function BackupTags() {
   };
 
   if (busy) {
-    return (
-      <Screen>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.lg }}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={[Type.heading, { textAlign: 'center' }]}>{busy}</Text>
-        </View>
-        {!!shards && <Button
-            kind="secondary"
-            title="Cancel"
-            onPress={() => {
-              cancelled.current = true;
-              cancelTap();
-            }}
-          />}
-      </Screen>
-    );
+    const cancel = () => {
+      cancelled.current = true;
+      cancelTap();
+    };
+    return <Screen><Busy message={busy} onCancel={shards ? cancel : undefined} /></Screen>;
   }
 
   if (!shards) {
     const short = pin.length > 0 && pin.length < MIN_PIN;
     return (
       <Screen>
-        <Text style={[Type.body, { color: Colors.inkSoft }]}>
-          Your wallet is split across 3 tags. Any 2 tags plus this PIN bring it back; 1 tag alone reveals nothing.
-        </Text>
+        <Intro>Your wallet is split across 3 tags. Any 2 tags plus this PIN bring it back; 1 tag alone reveals nothing.</Intro>
         <SecretInput secureTextEntry placeholder={`PIN, at least ${MIN_PIN} characters`} value={pin} onChangeText={setPin} />
         <SecretInput secureTextEntry placeholder="Type it again" value={confirm} onChangeText={setConfirm} />
         <Text style={[Type.small, { color: short ? Colors.negative : Colors.inkSoft }]}>
           Longer is safer: someone who finds 2 of your tags can guess PINs as long as they like. Letters and numbers both work.
         </Text>
         <Text style={Type.small}>Remember it. If you write it down, keep that paper away from every tag.</Text>
-        {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
+        <ErrorText>{error}</ErrorText>
         <View style={{ flex: 1 }} />
         <Button title="Continue" disabled={pin.length < MIN_PIN || pin !== confirm} onPress={lock} />
       </Screen>
@@ -89,14 +76,17 @@ export default function BackupTags() {
   const done = ids.length === 3;
   return (
     <Screen>
-      {[0, 1, 2].map((i) => (
-        <View key={i} style={[s.card, { flexDirection: 'row', justifyContent: 'space-between', borderColor: i === ids.length ? Colors.primary : undefined }]}>
-          <Text style={Type.heading}>Tag {i + 1}</Text>
-          <Text style={[Type.small, { color: i < ids.length ? Colors.positive : Colors.inkSoft }]}>
-            {i < ids.length ? 'Written and checked ✓' : i === ids.length ? 'Next' : ''}
-          </Text>
-        </View>
-      ))}
+      <List>
+        {[0, 1, 2].map((i) => (
+          <Row
+            key={i}
+            icon={i < ids.length ? 'checkmark-circle' : 'radio-button-off'}
+            tone={i < ids.length ? 'positive' : undefined}
+            title={`Tag ${i + 1}`}
+            right={i < ids.length ? 'Written and checked' : i === ids.length ? 'Next' : ''}
+          />
+        ))}
+      </List>
       {askOverwrite ? (
         <View style={[s.card, { gap: Spacing.sm }]}>
           <Text style={Type.heading}>This tag already has something on it</Text>
@@ -105,12 +95,10 @@ export default function BackupTags() {
           <Button kind="secondary" title="Use another tag" onPress={() => write()} />
         </View>
       ) : (
-        !!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>
+        <ErrorText>{error}</ErrorText>
       )}
       {done && (
-        <Text style={[Type.body, { color: Colors.inkSoft }]}>
-          Keep the 3 tags in 3 different places. Don’t write anything on them: a blank tag gives no clue it belongs to a wallet.
-        </Text>
+        <Intro>Keep the 3 tags in 3 different places. Don’t write anything on them: a blank tag gives no clue it belongs to a wallet.</Intro>
       )}
       <View style={{ flex: 1 }} />
       {done ? (

@@ -1,9 +1,9 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import * as SecureStore from 'expo-secure-store';
 
-import { accountExists, cosignersOf, isConfigured, rekey, server } from '@/lib/chain';
+import { accountExists, configure, cosignersOf, isConfigured, server, signersOf } from '@/lib/chain';
 
-const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until re-keyed, then its device key
+const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until protected, then its device key
 const ACCOUNT_KEY = 'wallet.account'; // the G… address, which is always the recovery key's
 const PENDING_KEY = 'wallet.pendingDevice';
 const BACKUPS_KEY = 'wallet.backups';
@@ -23,8 +23,8 @@ export function getWallet(): Promise<Wallet | null> {
   return wallet;
 }
 
-/** Re-keyed: this phone holds only its own device key; the recovery key lives on the backups. */
-export const isRekeyed = (w: Wallet) => w.signer.publicKey() !== w.account;
+/** Protected: this phone holds only its own device key; the recovery key lives on the backups. */
+export const isProtected = (w: Wallet) => w.signer.publicKey() !== w.account;
 
 async function requireWallet(): Promise<Wallet> {
   const w = await getWallet();
@@ -39,7 +39,7 @@ export async function forgetWallet(): Promise<void> {
   funded = undefined;
 }
 
-/** Stores the recovery key (created, imported or restored). Re-keying happens later, once online. */
+/** Stores the recovery key (created, imported or restored). The phone can do everything until protected. */
 export async function saveWallet(seed: Uint8Array): Promise<void> {
   const kp = Keypair.fromRawEd25519Seed(Buffer.from(seed));
   await SecureStore.setItemAsync(ACCOUNT_KEY, kp.publicKey());
@@ -49,35 +49,44 @@ export async function saveWallet(seed: Uint8Array): Promise<void> {
   funded = undefined;
 }
 
-let rekeying: Promise<void> | undefined;
+let protecting: Promise<void> | undefined;
 
 /**
- * Gives this phone its own device key and deletes the recovery key from it (rules in chain.ts).
- * Only once a backup exists: afterwards the recovery key lives nowhere else. Also run after a
- * restore, where it fires the old phone's key. Safe to call repeatedly and to crash mid-way.
+ * Gives this phone its own device key, sets the second factors (rules in chain.ts) and deletes the
+ * recovery key from the phone. Needs a backup: afterwards the recovery key lives nowhere else.
+ * Safe to retry after a crash: the new key is saved before the ledger can trust it.
  */
-export function ensureRekeyed(): Promise<void> {
-  rekeying ??= (async () => {
+export function protectWallet(cosigners: string[]): Promise<void> {
+  protecting ??= (async () => {
     const w = await requireWallet();
-    if (isRekeyed(w) || !(await getBackups()).length) return;
-    await ensureFunded();
-    // saved before submitting, so a crash after the ledger accepts it can't lose a key the account trusts
+    if (isProtected(w)) throw new Error('Already protected; changes need your backup.');
+    if (!(await getBackups()).length) throw new Error('Back up first: after this, your backup is the only way to change who controls the wallet.');
     const pending = await SecureStore.getItemAsync(PENDING_KEY);
     const device = pending ? Keypair.fromSecret(pending) : Keypair.random();
     if (!pending) await SecureStore.setItemAsync(PENDING_KEY, device.secret());
-    const entry = await server.getAccountEntry(w.account);
-    if (!isConfigured(entry, device.publicKey(), cosignersOf(entry))) await rekey(w.signer, device.publicKey());
-    await SecureStore.setItemAsync(ACCOUNT_KEY, w.account);
+    if (!isConfigured(await server.getAccountEntry(w.account), device.publicKey(), cosigners)) await configure(w.signer, device.publicKey(), cosigners);
     await SecureStore.setItemAsync(SIGNER_KEY, device.secret()); // the recovery key leaves this phone here
     await SecureStore.deleteItemAsync(PENDING_KEY);
     wallet = Promise.resolve({ account: w.account, signer: device });
   })();
-  const clear = () => (rekeying = undefined);
-  rekeying.then(clear, clear);
-  return rekeying;
+  const clear = () => (protecting = undefined);
+  protecting.then(clear, clear);
+  return protecting;
+}
+
+/**
+ * After a restore onto this phone: if the wallet was protected, protect it again right away. That
+ * locks out the old phone (still a signer) and keeps the second factors. Unprotected wallets stay as they are.
+ */
+export async function keepProtection(): Promise<void> {
+  const w = await requireWallet();
+  if (isProtected(w) || !(await accountExists(w.account))) return;
+  const entry = await server.getAccountEntry(w.account);
+  if (signersOf(entry).length) await protectWallet(cosignersOf(entry));
 }
 
 export type BackupRecord = { kind: 'phrase' | 'key' | 'tags'; at: string };
+export const BACKUP_LABEL: Record<BackupRecord['kind'], string> = { phrase: 'Recovery phrase', key: 'Secret key', tags: 'NFC tags' };
 
 export async function recordBackups(kinds: BackupRecord['kind'][]): Promise<void> {
   const at = new Date().toISOString();

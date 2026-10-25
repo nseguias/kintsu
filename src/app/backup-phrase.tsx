@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Button, OfflineOnly, Screen, SecretInput, s } from '@/components/ui';
+import { Button, Intro, OfflineOnly, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { getDraft } from '@/lib/draft';
 
@@ -20,14 +20,12 @@ export default function BackupPhrase() {
   return (
     <Screen>
       <OfflineOnly>
-        <Text style={[Type.body, { color: Colors.inkSoft }]}>
-          Write these {words.length} words in order with pen on paper. No photos; screenshots are blocked.
-        </Text>
+        <Intro>Write these {words.length} words in order with pen on paper. No photos; screenshots are blocked.</Intro>
         <View style={[s.card, { flexDirection: 'row', flexWrap: 'wrap', rowGap: Spacing.sm }]}>
           {words.map((w, i) => (
             <View key={i} style={{ width: '33.3%', flexDirection: 'row', gap: 6, alignItems: 'baseline' }}>
               <Text style={[Type.tiny, { width: 18, textAlign: 'right' }]}>{i + 1}</Text>
-              <Text style={[Type.body, { fontWeight: '500' }]}>{w}</Text>
+              <Text style={Type.heading}>{w}</Text>
             </View>
           ))}
         </View>

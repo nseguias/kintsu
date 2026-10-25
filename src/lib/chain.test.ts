@@ -1,7 +1,11 @@
 import { Keypair, Operation } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { configure, cosignersOf, isConfigured, needs2fa, newTx, rekey, server, signersOf, submit } from './chain';
+import { configure, cosignersOf, isConfigured, needs2fa, newTx, server, signersOf, submit } from './chain';
+
+// what protecting a (new) phone does: this phone in, every other phone out, second factors kept
+const rekey = async (recovery: Keypair, device: string) =>
+  configure(recovery, device, cosignersOf(await server.getAccountEntry(recovery.publicKey())));
 
 // Talks to testnet (Friendbot + RPC): TESTNET=1 npm test
 describe.skipIf(!process.env.TESTNET)('keys on testnet', () => {

@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Button, Choice, Screen } from '@/components/ui';
-import { Colors, Type } from '@/constants/theme';
+import { Button, Choice, Intro, Screen } from '@/components/ui';
 import { getDraft, nextBackup } from '@/lib/draft';
 
 export default function BackupChoice() {
@@ -22,13 +21,11 @@ export default function BackupChoice() {
 
   return (
     <Screen>
-      <Text style={[Type.body, { color: Colors.inkSoft }]}>
-        Pick one or more. Each one alone is enough to get your wallet back, so two is safer than one.
-      </Text>
+      <Intro>Pick one or more. Each one alone is enough to get your wallet back, so two is safer than one.</Intro>
       <Choice title="NFC tags" body="Split across 3 tags + a PIN. Any 2 restore it." selected={tags} onPress={() => setTags(!tags)} />
       <Choice
         title="Recovery phrase on paper"
-        body={canPhrase ? `${d.mnemonic!.split(' ').length} words, written by hand. Works in other Stellar wallets.` : d.imported && d.mnemonic ? 'You already have it on paper.' : 'Not available for a wallet imported from an S… key.'}
+        body={canPhrase ? `${d.mnemonic!.split(' ').length} words, written by hand. Works in other Stellar wallets.` : d.imported && d.mnemonic ? 'You already have it on paper.' : 'Only shown once, when a wallet is created.'}
         selected={phrase}
         disabled={!canPhrase}
         onPress={() => setPhrase(!phrase)}

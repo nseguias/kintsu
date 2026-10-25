@@ -1,120 +1,86 @@
-import { Link, useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
-import { Button, Screen, s } from '@/components/ui';
+import { Button, ErrorText, Icon, List, Row, Screen, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { needs2fa, server } from '@/lib/chain';
-import { startDraft } from '@/lib/draft';
-import { ensureRekeyed, getBackups, getWallet, getXlmBalance, isRekeyed, type BackupRecord } from '@/lib/stellar';
+import { backUp } from '@/lib/draft';
+import { BACKUP_LABEL, getBackups, getWallet, getXlmBalance, isProtected, keepProtection, type BackupRecord } from '@/lib/stellar';
 
-const LABEL: Record<BackupRecord['kind'], string> = { phrase: 'Recovery phrase on paper', key: 'Secret key on paper', tags: 'NFC tags' };
+type Status = { balance?: number; backups: BackupRecord[]; protectedNow: boolean; twoFactor: boolean };
 
 export default function Home() {
   const router = useRouter();
-  const [address, setAddress] = useState('');
-  const [balance, setBalance] = useState<number>();
+  const [status, setStatus] = useState<Status>();
   const [error, setError] = useState('');
-  const [backups, setBackups] = useState<BackupRecord[]>([]);
-  const [rekeyed, setRekeyed] = useState<boolean>();
-  const [twoFactor, setTwoFactor] = useState<boolean>();
 
   const refresh = useCallback(async () => {
     setError('');
+    const backups = await getBackups();
     try {
-      setBalance(await getXlmBalance());
-      await ensureRekeyed();
-      const w = await getWallet();
-      setRekeyed(!!w && isRekeyed(w));
-      if (w) setTwoFactor(needs2fa(await server.getAccountEntry(w.account)));
+      const balance = await getXlmBalance();
+      await keepProtection(); // after a restore of a protected wallet: lock the old phone out
+      const w = (await getWallet())!;
+      setStatus({ balance, backups, protectedNow: isProtected(w), twoFactor: needs2fa(await server.getAccountEntry(w.account)) });
     } catch (e) {
-      setError(String(e).includes('Network') ? "Can't reach Stellar. Turn airplane mode off to see your balance." : String(e));
+      const w = await getWallet();
+      setStatus((st) => st ?? { backups, protectedNow: !!w && isProtected(w), twoFactor: false });
+      setError(String(e).includes('Network') ? 'Can’t reach Stellar. Check your connection and pull down to refresh.' : String(e));
     }
   }, []);
 
-  // refresh whenever Home comes back into view (e.g. after sending)
+  // refresh whenever Home comes back into view (after sending, protecting, …)
   useFocusEffect(useCallback(() => void refresh(), [refresh]));
 
-  useEffect(() => {
-    getWallet().then((w) => {
-      setAddress(w?.account ?? '');
-      setRekeyed(!!w && isRekeyed(w));
-    });
-    getBackups().then(setBackups);
-  }, []);
-
+  const st = status;
   return (
-    <Screen noHeader>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={[Type.title, { fontWeight: '700' }]}>Shards</Text>
+    <Screen noHeader onRefresh={refresh}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+        <Text style={[Type.title, { flex: 1 }]}>Shards</Text>
         <Text style={[Type.tiny, { backgroundColor: Colors.neutralChip, paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full }]}>TESTNET</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Settings" hitSlop={12} onPress={() => router.push('/settings')}>
+          <Icon name="settings-outline" />
+        </Pressable>
       </View>
 
-      <View style={[s.card, { gap: 6, borderRadius: Radius.xl }]}>
+      <View style={[s.card, { gap: Spacing.sm }]}>
         <Text style={Type.small}>Balance</Text>
         <Text style={[Type.num, { fontSize: 44 }]}>
-          {balance === undefined ? '…' : balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text style={{ fontSize: 20, color: Colors.inkSoft }}>XLM</Text>
+          {st?.balance === undefined ? '…' : st.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+          <Text style={{ fontSize: 20, color: Colors.inkSoft }}>XLM</Text>
         </Text>
-        <Text selectable style={[Type.small, { fontFamily: 'monospace' }]}>{address}</Text>
-        {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <ErrorText>{error}</ErrorText>
+        <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
           <View style={{ flex: 1 }}>
-            <Button title="Send" disabled={!balance} onPress={() => router.push('/send')} />
+            <Button title="Send" disabled={!st?.balance} onPress={() => router.push('/send')} />
           </View>
           <View style={{ flex: 1 }}>
             <Button kind="secondary" title="Receive" onPress={() => router.push('/receive')} />
           </View>
         </View>
-        <Button kind="link" title="Refresh" onPress={refresh} />
       </View>
 
-      <Text style={s.label}>BACKUPS</Text>
-      {backups.length ? (
-        backups.map((b) => (
-          <View key={b.kind} style={[s.card, { flexDirection: 'row', justifyContent: 'space-between' }]}>
-            <Text style={Type.heading}>{LABEL[b.kind]}</Text>
-            <Text style={Type.small}>{new Date(b.at).toLocaleDateString()}</Text>
-          </View>
-        ))
-      ) : (
-        <View style={[s.card, { backgroundColor: Colors.accentSoft, borderColor: Colors.accent }]}>
-          <Text style={Type.heading}>Not backed up</Text>
-          <Text style={Type.small}>If this phone is lost, so is the wallet.</Text>
-        </View>
-      )}
-
-      {rekeyed ? (
-        <View style={[s.card, { gap: 4 }]}>
-          <Text style={Type.heading}>This phone has its own key ✓</Text>
-          <Text style={Type.small}>It can send, but can’t change who controls the wallet. Your recovery key is only on your backups.</Text>
-          {twoFactor ? (
-            <Text style={[Type.small, { color: Colors.positive }]}>2FA on: every payment also needs your YubiKey.</Text>
-          ) : twoFactor === false ? (
-            <Button kind="secondary" title="Turn on 2FA with a YubiKey" onPress={() => router.push('/two-factor')} />
-          ) : null}
-        </View>
-      ) : (
-        <>
-          {backups.length > 0 && rekeyed === false && (
-            <Text style={Type.small}>Next time you’re online, this phone gets its own key and the recovery key is removed from it.</Text>
+      {st && (
+        <List label="SECURITY">
+          {st.backups.length ? (
+            <Row icon="checkmark-circle" tone="positive" title="Backed up" detail={st.backups.map((b) => BACKUP_LABEL[b.kind]).join(' · ')} onPress={() => router.push('/settings')} />
+          ) : (
+            <Row icon="alert-circle" tone="negative" title="Not backed up" detail="If this phone is lost, so is the wallet." onPress={() => backUp(router)} />
           )}
-          {/* ponytail: needs the recovery key, so only before re-key; after it, restore from paper/tags first */}
-          <Button
-            kind="secondary"
-            title={backups.some((b) => b.kind === 'tags') ? 'Write new NFC tags' : 'Back up to NFC tags'}
-            onPress={async () => {
-              // works for any wallet, created here or imported: tags hold the same key either way
-              const w = (await getWallet())!;
-              if (isRekeyed(w)) return; // the device key on tags would restore nothing
-              startDraft({ rawSeed: w.signer.rawSecretKey(), imported: false });
-              router.push('/backup-tags');
-            }}
-          />
-        </>
+          {st.protectedNow ? (
+            <Row
+              icon="shield-checkmark"
+              tone="positive"
+              title="Phone protected"
+              detail={st.twoFactor ? 'Payments also need your YubiKey' : 'YubiKey 2FA off'}
+              onPress={() => router.push('/protect')}
+            />
+          ) : (
+            <Row icon="shield-outline" tone="accent" title="Protect this wallet" detail="Limit what a stolen phone can do" onPress={() => router.push('/protect')} />
+          )}
+        </List>
       )}
-
-      <View style={{ flex: 1, minHeight: Spacing.xl }} />
-      <Link href="/nfc-check" style={[Type.small, { textAlign: 'center', padding: Spacing.md }]}>NFC test (dev)</Link>
     </Screen>
   );
 }

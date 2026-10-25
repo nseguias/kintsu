@@ -109,10 +109,8 @@ export async function configure(recovery: Keypair, device: string, cosigners: st
   await submit(built);
 }
 
-/** Gives a (new) phone its key: fires every other phone, keeps the second factors. */
-export async function rekey(recovery: Keypair, device: string): Promise<void> {
-  await configure(recovery, device, cosignersOf(await server.getAccountEntry(recovery.publicKey())));
-}
+/** XLM the account must hold for a phone key plus `cosigners` factors: 0.5 per entry (2 base, 1 per key) and a fee. */
+export const protectionMinimum = (cosigners: number) => (2 + 1 + cosigners) * 0.5 + 0.01;
 
 export type PaymentRequest = { to: string; amount?: string; memo?: string };
 

@@ -1,16 +1,30 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { getNetworkStateAsync } from 'expo-network';
 import React, { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 
-/** `noHeader` screens pad under the status bar themselves. */
-export function Screen({ children, noHeader }: { children: React.ReactNode; noHeader?: boolean }) {
+/** `noHeader` screens pad under the status bar themselves; `onRefresh` adds pull-to-refresh. */
+export function Screen({ children, noHeader, onRefresh }: { children: React.ReactNode; noHeader?: boolean; onRefresh?: () => Promise<void> }) {
   const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: Colors.background }}
+      refreshControl={
+        onRefresh && (
+          <RefreshControl
+            refreshing={refreshing}
+            colors={[Colors.primary]}
+            onRefresh={() => {
+              setRefreshing(true);
+              onRefresh().finally(() => setRefreshing(false));
+            }}
+          />
+        )
+      }
       contentContainerStyle={[s.screen, { paddingBottom: Spacing.xxl + insets.bottom }, noHeader && { paddingTop: insets.top + Spacing.lg }]}
       keyboardShouldPersistTaps="handled">
       {children}
@@ -30,6 +44,60 @@ export function Button({ title, onPress, kind = 'primary', disabled }: { title: 
   );
 }
 
+/** Muted intro paragraph at the top of a screen. */
+export const Intro = ({ children }: { children: React.ReactNode }) => <Text style={[Type.body, { color: Colors.inkSoft }]}>{children}</Text>;
+
+export const ErrorText = ({ children }: { children?: string }) => (children ? <Text style={[Type.small, { color: Colors.negative }]}>{children}</Text> : null);
+
+/** Full-screen wait while the user holds a tag/YubiKey or the network works. */
+export function Busy({ message, onCancel }: { message: string; onCancel?: () => void }) {
+  return (
+    <>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.lg }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={[Type.heading, { textAlign: 'center' }]}>{message}</Text>
+      </View>
+      {onCancel && <Button kind="secondary" title="Cancel" onPress={onCancel} />}
+    </>
+  );
+}
+
+export type IconName = React.ComponentProps<typeof Ionicons>['name'];
+export const Icon = ({ name, color = Colors.ink, size = 22 }: { name: IconName; color?: string; size?: number }) => <Ionicons name={name} color={color} size={size} />;
+
+/** One line in a list card: icon, title, optional detail, and a chevron when it opens something. */
+export function Row({ icon, title, detail, right, tone, onPress }: { icon?: IconName; title: string; detail?: string; right?: string; tone?: 'positive' | 'negative' | 'accent'; onPress?: () => void }) {
+  const color = tone ? Colors[tone] : Colors.ink;
+  return (
+    <Pressable accessibilityRole={onPress ? 'button' : undefined} disabled={!onPress} onPress={onPress} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}>
+      {icon && <Icon name={icon} color={tone ? color : Colors.primary} />}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[Type.heading, tone === 'negative' && { color }]}>{title}</Text>
+        {!!detail && <Text style={Type.small}>{detail}</Text>}
+      </View>
+      {!!right && <Text style={Type.small}>{right}</Text>}
+      {onPress && <Icon name="chevron-forward" color={Colors.inkFaint} size={18} />}
+    </Pressable>
+  );
+}
+
+/** A card of Rows with hairlines between them, under an optional section label. */
+export function List({ label, children }: { label?: string; children: React.ReactNode }) {
+  const rows = React.Children.toArray(children).filter(Boolean);
+  return (
+    <View style={{ gap: Spacing.sm }}>
+      {!!label && <Text style={s.label}>{label}</Text>}
+      <View style={[s.card, { paddingVertical: 0 }]}>
+        {rows.map((r, i) => (
+          <View key={i} style={i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border }}>
+            {r}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 /** A selectable card: radio or checkbox, depending on how the caller uses `selected`. */
 export function Choice({ title, body, selected, onPress, disabled, style }: { title: string; body?: string; selected: boolean; onPress: () => void; disabled?: boolean; style?: ViewStyle }) {
   return (
@@ -38,9 +106,12 @@ export function Choice({ title, body, selected, onPress, disabled, style }: { ti
       accessibilityState={{ checked: selected, disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[s.card, { borderWidth: 2, borderColor: selected ? Colors.primary : Colors.border }, disabled && { opacity: 0.45 }, style]}>
-      <Text style={Type.heading}>{title}</Text>
-      {!!body && <Text style={[Type.small, { marginTop: 4 }]}>{body}</Text>}
+      style={[s.card, { borderWidth: 2, borderColor: selected ? Colors.primary : Colors.border, flexDirection: 'row', gap: Spacing.sm }, disabled && { opacity: 0.45 }, style]}>
+      <View style={{ flex: 1 }}>
+        <Text style={Type.heading}>{title}</Text>
+        {!!body && <Text style={[Type.small, { marginTop: 4 }]}>{body}</Text>}
+      </View>
+      <Icon name={selected ? 'checkmark-circle' : 'ellipse-outline'} color={selected ? Colors.primary : Colors.inkFaint} />
     </Pressable>
   );
 }
@@ -116,4 +187,5 @@ export const s = StyleSheet.create({
   segment: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.full },
   input: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: Radius.md, padding: Spacing.md, ...Type.body },
   label: { ...Type.tiny, marginTop: Spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, minHeight: 56 },
 });

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Button, Screen } from '@/components/ui';
+import { Button, Intro, Screen } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { getDraft, nextBackup } from '@/lib/draft';
 
@@ -36,7 +36,7 @@ export default function Verify() {
 
   return (
     <Screen>
-      <Text style={[Type.body, { color: Colors.inkSoft }]}>Without looking back, pick these 3 words from your paper.</Text>
+      <Intro>Without looking back, pick these 3 words from your paper.</Intro>
       {quiz.map((q) => (
         <View key={q.n} style={{ gap: Spacing.sm }} accessibilityRole="radiogroup" accessibilityLabel={`Word ${q.n}`}>
           <Text style={Type.heading}>Word #{q.n}</Text>

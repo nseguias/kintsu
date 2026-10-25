@@ -57,6 +57,8 @@ export const Type = {
   body: { fontSize: 15, fontWeight: '400' as const, color: Colors.ink },
   small: { fontSize: 13, fontWeight: '400' as const, color: Colors.inkSoft },
   tiny: { fontSize: 11, fontWeight: '600' as const, color: Colors.inkFaint, letterSpacing: 0.3 },
+  // addresses, keys, hashes
+  mono: { fontFamily: 'monospace', fontSize: 15, color: Colors.ink },
   // serif numbers (amounts)
   num: { fontFamily: Fonts.serif, color: Colors.ink, fontVariant: ['tabular-nums' as const] },
 };

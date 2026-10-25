@@ -53,17 +53,16 @@ fp = SHA-256(ed25519 public key)[0..4]
 
 **Rotate / wipe**: "Overwrite tags" re-runs backup; "Erase tag" writes an empty NDEF message.
 
-## Keys, weights and 2FA
+## Keys, weights and protection
 - **Recovery key** = the wallet's own key (phrase, paper S… key, tags); the G… address is always its. **Phone key** = random, only in this phone's SecureStore. **Second factors** = the YubiKey (OpenPGP Ed25519 key, over NFC) and later the helper service.
+- **Simple by default:** after creating/importing/restoring, the phone holds the recovery key and can do everything, like a normal wallet. Nothing happens on-chain on its own.
+- **Protect (optional, Home → Protect this wallet):** one recovery-signed transaction adds a phone key (and optionally the YubiKey), then the recovery key is deleted from the phone. No tags needed, since the phone still holds the recovery key. Needs a backup first and enough XLM for the reserves: (2 + 1 + factors) × 0.5 XLM (`protectionMinimum`).
 - Weights double as roles (`src/lib/chain.ts`): recovery 5, phone 2, second factor 1. Thresholds: low 1, medium 2 without 2FA / 3 with it, high 5.
   - Sending: phone alone (2) without 2FA; with 2FA phone + one factor (3). Factors without the phone (1 + 1) never reach 3.
-  - Changing keys: only the recovery key; phone + every factor is 4 < 5.
-- One transaction, `configure(recovery, phone, factors)`, signed by the recovery key sets exactly that state and removes every other signer. Used to:
-  - re-key after the first backup (automatic from Home once online); the phone then overwrites the recovery key with its own key, saving the new key before submitting so a crash can't lose it;
-  - restore: fires every old phone (weight 2), keeps the factors (weight 1);
-  - turn 2FA on (tap the YubiKey, then 2 tags + PIN) or off (lost YubiKey).
-- Accounts re-keyed by the first version (master 2, phone 1) are upgraded by the next `configure`.
-- Costs 0.5 XLM of reserve per signer. Tested on testnet: `TESTNET=1 npm test`.
+  - Changing keys: only the recovery key; phone + every factor is 4 < 5. On a protected phone that means 2 tags + PIN (add a YubiKey, turn 2FA off).
+- `configure(recovery, phone, factors)` sets exactly that state and removes every other signer.
+- **Restore of a protected wallet** re-protects at once (`keepProtection` on Home): the old phone (weight 2) is removed, factors (weight 1) kept.
+- Known limit: a protected phone can't write new backups (it no longer holds the recovery key).
 
 ## YubiKey
 - Only the OpenPGP app's signing slot is used; FIDO (security-key logins), OTP, PIV and OATH are separate apps the commands can't reach.

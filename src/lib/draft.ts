@@ -1,7 +1,7 @@
 import { stellarSeed } from '@crypto/mnemonic';
 import type { Router } from 'expo-router';
 
-import { recordBackups, saveWallet } from '@/lib/stellar';
+import { getWallet, isProtected, recordBackups, saveWallet } from '@/lib/stellar';
 
 export type Backup = 'phrase' | 'key' | 'tags';
 
@@ -44,4 +44,12 @@ export async function nextBackup(router: Router, finished?: Backup) {
   // unmount every screen that showed a secret (and lift their screenshot block) before Home
   if (router.canDismiss()) router.dismissAll();
   router.replace('/home');
+}
+
+/** Back up (again) the wallet already on this phone. Only while the phone still holds the recovery key. */
+export async function backUp(router: Router) {
+  const w = await getWallet();
+  if (!w || isProtected(w)) return; // a protected phone's own key on a backup would restore nothing
+  startDraft({ rawSeed: w.signer.rawSecretKey(), imported: false });
+  router.push('/backup');
 }

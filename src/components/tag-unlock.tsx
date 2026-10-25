@@ -1,9 +1,8 @@
 import { combineShards, openShard, type Shard } from '@crypto/shards';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Button, SecretInput, s } from '@/components/ui';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Busy, Button, ErrorText, Intro, List, Row, SecretInput } from '@/components/ui';
 import { cancelTap, readShardBytes } from '@/lib/nfc';
 
 /**
@@ -42,35 +41,29 @@ export function TagUnlock({ intro, onSeed }: { intro: string; onSeed: (seed: Uin
   };
 
   if (busy) {
-    return (
-      <>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.lg }}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={[Type.heading, { textAlign: 'center' }]}>{busy}</Text>
-        </View>
-        <Button
-          kind="secondary"
-          title="Cancel"
-          onPress={() => {
-            cancelled.current = true;
-            cancelTap();
-          }}
-        />
-      </>
-    );
+    const cancel = () => {
+      cancelled.current = true;
+      cancelTap();
+    };
+    return <Busy message={busy} onCancel={cancel} />;
   }
 
   return (
     <>
-      <Text style={[Type.body, { color: Colors.inkSoft }]}>{intro}</Text>
+      <Intro>{intro}</Intro>
       {!first && <SecretInput secureTextEntry placeholder="PIN you chose for your tags" value={pin} onChangeText={setPin} />}
-      {[0, 1].map((i) => (
-        <View key={i} style={[s.card, { flexDirection: 'row', justifyContent: 'space-between' }]}>
-          <Text style={Type.heading}>{i ? 'Second tag' : 'First tag'}</Text>
-          <Text style={[Type.small, { color: i === 0 && first ? Colors.positive : Colors.inkSoft }]}>{i === 0 && first ? 'Unlocked ✓' : ''}</Text>
-        </View>
-      ))}
-      {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
+      <List>
+        {[0, 1].map((i) => (
+          <Row
+            key={i}
+            icon={i === 0 && first ? 'checkmark-circle' : 'radio-button-off'}
+            tone={i === 0 && first ? 'positive' : undefined}
+            title={i ? 'Second tag' : 'First tag'}
+            right={i === 0 && first ? 'Unlocked' : ''}
+          />
+        ))}
+      </List>
+      <ErrorText>{error}</ErrorText>
       <View style={{ flex: 1 }} />
       <Button title={first ? 'Tap the second tag' : 'Tap a tag'} disabled={!pin} onPress={tap} />
       {!!first && (

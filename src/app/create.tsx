@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Button, Choice, Screen, Segmented, s } from '@/components/ui';
+import { Button, ErrorText, Screen, Segmented, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { startDraft } from '@/lib/draft';
 
@@ -47,11 +47,11 @@ export default function Create() {
       />
 
       <Text style={s.label}>RANDOMNESS FROM</Text>
-      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-        <Choice style={{ flex: 1, padding: Spacing.md }} title="Random" body="Phone" selected={source === 'random'} onPress={() => setSource('random')} />
-        <Choice style={{ flex: 1, padding: Spacing.md }} title="Dice" body={`${need} rolls`} selected={source === 'dice'} onPress={() => setSource('dice')} />
-        <Choice style={{ flex: 1, padding: Spacing.md }} title="Camera" body="2 photos" selected={source === 'camera'} onPress={() => setSource('camera')} />
-      </View>
+      <Segmented
+        options={[{ label: 'Phone', value: 'random' }, { label: 'Dice', value: 'dice' }, { label: 'Camera', value: 'camera' }]}
+        value={source}
+        onChange={setSource}
+      />
 
       {source === 'random' && (
         <Text style={Type.small}>Your phone’s secure random generator makes {words === 12 ? 128 : 256} bits of randomness.</Text>
@@ -59,7 +59,7 @@ export default function Create() {
       {source === 'dice' && <Dice rolls={rolls} need={need} onChange={setRolls} />}
       {source === 'camera' && <Photos photos={photos} onChange={setPhotos} onError={setError} />}
 
-      {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
+      <ErrorText>{error}</ErrorText>
       <View style={{ flex: 1 }} />
       <Button
         title={source === 'dice' && !ready ? `${need - rolls.length} more rolls` : `Create ${words}-word wallet`}
@@ -95,7 +95,7 @@ function Dice({ rolls, need, onChange }: { rolls: string; need: number; onChange
         ))}
       </View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={[Type.small, { fontFamily: 'monospace' }]}>{rolls.slice(-20).replace(/(.{5})/g, '$1 ')}</Text>
+        <Text style={Type.mono}>{rolls.slice(-20).replace(/(.{5})/g, '$1 ')}</Text>
         <Button kind="link" title="Undo last" disabled={!rolls} onPress={() => onChange(rolls.slice(0, -1))} />
       </View>
     </View>

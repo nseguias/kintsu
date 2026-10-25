@@ -2,9 +2,9 @@ import { StrKey, type Transaction } from '@stellar/stellar-sdk';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
-import { Button, Screen, SecretInput, s } from '@/components/ui';
+import { Busy, Button, ErrorText, Intro, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, cosignersOf, needs2fa, parsePaymentQr, paymentTx, server, spendable, submit } from '@/lib/chain';
 import { getWallet } from '@/lib/stellar';
@@ -117,16 +117,7 @@ export default function Send() {
     );
   }
 
-  if (busy) {
-    return (
-      <Screen>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.lg }}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={Type.heading}>{busy}</Text>
-        </View>
-      </Screen>
-    );
-  }
+  if (busy) return <Screen><Busy message={busy} /></Screen>;
 
   if (sent) {
     return (
@@ -134,7 +125,7 @@ export default function Send() {
         <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.md }}>
           <Text style={[Type.title, { textAlign: 'center' }]}>Sent ✓</Text>
           <Text style={[Type.body, { textAlign: 'center' }]}>{amount} XLM is on its way.</Text>
-          <Text selectable style={[Type.small, { textAlign: 'center', fontFamily: 'monospace' }]}>{sent}</Text>
+          <Text selectable style={[Type.small, { textAlign: 'center' }]}>Transaction {sent.slice(0, 8)}…{sent.slice(-8)}</Text>
         </View>
         <Button title="Done" onPress={() => router.back()} />
       </Screen>
@@ -145,7 +136,7 @@ export default function Send() {
     return (
       <Screen>
         <Text style={Type.title}>Your YubiKey PIN</Text>
-        <Text style={[Type.body, { color: Colors.inkSoft }]}>Then hold your YubiKey to the back of the phone to approve {amount} XLM.</Text>
+        <Intro>Then hold your YubiKey to the back of the phone to approve {amount} XLM.</Intro>
         <SecretInput secureTextEntry autoFocus placeholder="YubiKey PIN" value={pin} onChangeText={setPin} />
         <View style={{ flex: 1 }} />
         <Button title="Tap your YubiKey" disabled={pin.length < 6} onPress={send} />
@@ -161,13 +152,13 @@ export default function Send() {
           <Text style={Type.small}>Send</Text>
           <Text style={[Type.num, { fontSize: 32 }]}>{amount} XLM</Text>
           <Text style={Type.small}>To</Text>
-          <Text selectable style={[Type.body, { fontFamily: 'monospace' }]}>{dest.match(/.{1,4}/g)!.join(' ')}</Text>
+          <Text selectable style={Type.mono}>{dest.match(/.{1,4}/g)!.join(' ')}</Text>
           {!!memo && <Text style={Type.small}>Memo: {memo}</Text>}
           <Text style={Type.small}>Network fee: 0.0001 XLM</Text>
           {review.creates && <Text style={[Type.small, { color: Colors.accent }]}>This address is new to Stellar; this payment opens its account.</Text>}
         </View>
-        <Text style={Type.small}>Check the first and last characters of the address against where you copied it from.</Text>
-        {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
+        <Text style={Type.small}>Check the first and last characters of the address with the receiver.</Text>
+        <ErrorText>{error}</ErrorText>
         <View style={{ flex: 1 }} />
         <Button title={`Send ${amount} XLM`} onPress={review.factors.length ? () => setAskPin(true) : send} />
         <Button kind="link" title="Change" onPress={() => setReview(undefined)} />
@@ -179,7 +170,7 @@ export default function Send() {
     <Screen>
       <Button kind="secondary" title="Scan QR code" onPress={() => setScanning(true)} />
       <Text style={s.label}>TO</Text>
-      <TextInput style={[s.input, { fontFamily: 'monospace' }]} value={to} onChangeText={setTo} placeholder="G…" autoCapitalize="characters" autoCorrect={false} multiline />
+      <TextInput style={[s.input, Type.mono]} value={to} onChangeText={setTo} placeholder="G…" autoCapitalize="characters" autoCorrect={false} multiline />
       <Text style={s.label}>AMOUNT (XLM)</Text>
       <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
         <TextInput style={[s.input, { flex: 1 }]} value={amount} onChangeText={setAmount} placeholder="0" keyboardType="decimal-pad" />
@@ -188,7 +179,7 @@ export default function Send() {
       {max !== undefined && <Text style={Type.small}>Available: {max.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM</Text>}
       <Text style={s.label}>MEMO (OPTIONAL)</Text>
       <TextInput style={s.input} value={memo} onChangeText={setMemo} placeholder="Exchanges often require one" />
-      {!!(problem || error) && <Text style={[Type.small, { color: Colors.negative }]}>{problem || error}</Text>}
+      <ErrorText>{problem || error}</ErrorText>
       <View style={{ flex: 1 }} />
       <Button title="Review" disabled={!ready} onPress={prepare} />
     </Screen>

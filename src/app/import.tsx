@@ -46,7 +46,7 @@ export default function Import() {
                     accessibilityLabel={`Word ${i + 1}`}
                     value={words[i]}
                     onChangeText={(t) => setWords(words.map((w, j) => (j === i ? t : w)))}
-                    style={{ flex: 1, padding: 6, borderWidth: 0, borderBottomWidth: 1, borderRadius: 0, fontSize: 15, marginLeft: 4, color: i === unknown ? Colors.negative : Colors.ink }}
+                    style={{ flex: 1, padding: 6, borderWidth: 0, borderBottomWidth: 1, borderRadius: 0, marginLeft: 4, color: i === unknown ? Colors.negative : Colors.ink }}
                   />
                 </View>
               ))}
@@ -60,7 +60,7 @@ export default function Import() {
         ) : (
           <>
             <Text style={s.label}>SECRET KEY</Text>
-            <SecretInput value={secret} onChangeText={(t) => setSecret(t.toUpperCase())} maxLength={56} placeholder="S…" style={{ fontFamily: 'monospace' }} />
+            <SecretInput value={secret} onChangeText={(t) => setSecret(t.toUpperCase())} maxLength={56} placeholder="S…" style={Type.mono} />
             <Text style={Type.small}>
               Type it from your paper; paste is turned off. {secret.length}/56 characters{secret.length === 56 && !keyOk ? ', but it isn’t a valid key. Check for a typo.' : '.'}
             </Text>
