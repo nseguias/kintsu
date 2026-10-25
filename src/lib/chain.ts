@@ -148,6 +148,7 @@ const TOKENS: Record<Network, Token[]> = {
   ],
 };
 export const knownTokens = () => TOKENS[network];
+export const horizonUrl = () => NETWORKS[network].horizon;
 const assetOf = (t?: Token) => (t ? new Asset(t.code, t.issuer) : Asset.native());
 
 /** What the account holds of a known token: null if it hasn't added it (no trustline). */
@@ -206,7 +207,7 @@ export function toActivity(me: string, records: Record<string, string>[]): Activ
 
 /** Latest payments in and out of `address`, newest first. RPC has no per-account history, so this reads Horizon. */
 export async function recentActivity(address: string, limit = 5): Promise<Activity[]> {
-  const res = await fetch(`${NETWORKS[network].horizon}/accounts/${address}/payments?order=desc&limit=${limit}`);
+  const res = await fetch(`${horizonUrl()}/accounts/${address}/payments?order=desc&limit=${limit}`);
   if (res.status === 404) return []; // account not opened yet
   if (!res.ok) throw new Error(`History unavailable (${res.status})`);
   return toActivity(address, (await res.json())._embedded.records);

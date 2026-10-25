@@ -94,8 +94,8 @@ export const Icon = ({ name, color = Colors.ink, size = 22 }: { name: IconName; 
  * One line in a List card: icon or badge, title, optional detail, a value on the right, and a chevron
  * when it opens something. `active` highlights the step happening now.
  */
-export function Row({ icon, badge, badgeTone, title, detail, right, rightTone, tone, active, onPress }: {
-  icon?: IconName; badge?: IconName | string; badgeTone?: 'positive' | 'negative'; title: string; detail?: string; right?: string;
+export function Row({ icon, badge, badgeTone, title, detail, right, rightTone, tone, active, oneLine, onPress }: {
+  icon?: IconName; badge?: IconName | string; badgeTone?: 'positive' | 'negative'; title: string; detail?: string; right?: string; oneLine?: boolean;
   rightTone?: 'positive' | 'negative'; tone?: 'positive' | 'negative' | 'accent'; active?: boolean; onPress?: () => void;
 }) {
   const color = tone ? Colors[tone] : Colors.ink;
@@ -113,8 +113,8 @@ export function Row({ icon, badge, badgeTone, title, detail, right, rightTone, t
         </View>
       )}
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={[Type.heading, tone === 'negative' && { color }]}>{title}</Text>
-        {!!detail && <Text style={Type.small}>{detail}</Text>}
+        <Text style={[Type.heading, tone === 'negative' && { color }]} numberOfLines={oneLine ? 1 : undefined}>{title}</Text>
+        {!!detail && <Text style={Type.small} numberOfLines={oneLine ? 1 : undefined}>{detail}</Text>}
       </View>
       {!!right && <Text style={[Type.heading, { fontVariant: ['tabular-nums'] }, rightTone && { color: Colors[rightTone] }]}>{right}</Text>}
       {onPress && !right && <Icon name="chevron-forward" color={Colors.inkFaint} size={18} />}

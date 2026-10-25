@@ -11,6 +11,7 @@ const short = (g: string) => `${g.slice(0, 4)}…${g.slice(-4)}`;
 export function ActivityRow({ a }: { a: Activity }) {
   return (
     <Row
+      oneLine
       badge={a.incoming ? 'arrow-down' : 'arrow-up'}
       badgeTone={a.incoming ? 'positive' : 'negative'}
       title={a.incoming ? 'Received' : 'Sent'}

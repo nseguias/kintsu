@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { Transaction } from '@stellar/stellar-sdk';
 
-import { accountExists, configure, cosignersOf, isConfigured, knownTokens, needs2fa, network, server, signersOf, selectNetwork, submit, tokenBalance, type Network, type Token } from '@/lib/chain';
+import { accountExists, configure, cosignersOf, horizonUrl, isConfigured, knownTokens, needs2fa, network, server, signersOf, selectNetwork, submit, type Network, type Token } from '@/lib/chain';
 import { signWithYubiKey } from '@/lib/yubikey';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until protected, then its device key
@@ -149,11 +149,25 @@ export async function approve(tx: Transaction, pin?: string, onTap?: () => void)
 
 export type Holding = { token?: Token; amount: number }; // no token = XLM
 
-/** XLM plus every known token this wallet has added, XLM first. */
+/**
+ * Everything this wallet holds, read from the ledger (XLM first): whatever is in the account shows,
+ * added here or not. Tokens Shards hasn't checked are marked so a look-alike "USDC" can't pass as Circle's.
+ */
 export async function getHoldings(): Promise<Holding[]> {
   const address = (await requireWallet()).account;
-  if (!(await accountExists(address))) return [{ amount: 0 }];
-  const xlm = Number((await server.getAccountEntry(address)).balance) / 1e7;
-  const tokens = await Promise.all(knownTokens().map(async (token) => ({ token, amount: await tokenBalance(address, token) })));
-  return [{ amount: xlm }, ...tokens.flatMap(({ token, amount }) => (amount === null ? [] : [{ token, amount }]))];
+  const res = await fetch(`${horizonUrl()}/accounts/${address}`);
+  if (res.status === 404) return [{ amount: 0 }]; // not opened yet
+  if (!res.ok) throw new Error(`Network error ${res.status}`);
+  const { balances } = (await res.json()) as { balances: { asset_type: string; asset_code?: string; asset_issuer?: string; balance: string }[] };
+  const known = knownTokens();
+  const xlm = Number(balances.find((b) => b.asset_type === 'native')?.balance ?? 0);
+  const tokens = balances.flatMap((b) =>
+    b.asset_code && b.asset_issuer
+      ? [{
+          token: known.find((t) => t.code === b.asset_code && t.issuer === b.asset_issuer) ?? { code: b.asset_code, issuer: b.asset_issuer, name: 'Unverified issuer' },
+          amount: Number(b.balance),
+        }]
+      : [],
+  );
+  return [{ amount: xlm }, ...tokens];
 }

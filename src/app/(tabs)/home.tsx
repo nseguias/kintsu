@@ -3,19 +3,22 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ActivityRow, fmt } from '@/components/activity-row';
-import { ErrorText, Icon, List, Row, Screen, s, type IconName } from '@/components/ui';
+import { ErrorText, Icon, List, Row, Screen, Segmented, s, type IconName } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, network, recentActivity, type Activity } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
 import { getBackups, getHoldings, getTestXlm, getWallet, isProtected, keepProtection, type Holding } from '@/lib/stellar';
 
 type Status = { holdings: Holding[]; opened: boolean; activity: Activity[]; backedUp: boolean; protectedNow: boolean };
+const ROW = 72; // every row in the Home list is this tall, so we can show only the ones that fit whole
 
 export default function Home() {
   const router = useRouter();
   const [st, setSt] = useState<Status>();
   const [error, setError] = useState('');
   const [address, setAddress] = useState('');
+  const [tab, setTab] = useState<'tokens' | 'activity'>('tokens');
+  const [space, setSpace] = useState(0);
 
   const refresh = useCallback(async () => {
     setError('');
@@ -24,7 +27,7 @@ export default function Home() {
       const w = (await getWallet())!;
       setAddress(w.account);
       await keepProtection(); // after a restore of a protected wallet: lock the old phone out
-      const [holdings, opened, activity] = await Promise.all([getHoldings(), accountExists(w.account), recentActivity(w.account)]);
+      const [holdings, opened, activity] = await Promise.all([getHoldings(), accountExists(w.account), recentActivity(w.account, 20)]);
       const now = (await getWallet())!;
       setSt({ holdings, opened, activity, backedUp, protectedNow: isProtected(now) });
     } catch (e) {
@@ -37,6 +40,31 @@ export default function Home() {
   useFocusEffect(useCallback(() => void refresh(), [refresh]));
 
   const xlm = st?.holdings[0]?.amount;
+  const rows =
+    tab === 'tokens'
+      ? (st?.holdings ?? []).map((h) => (
+          <Row
+            key={h.token ? `${h.token.code}:${h.token.issuer}` : 'XLM'}
+            oneLine
+            badge={h.token ? h.token.code[0] : 'X'}
+            title={h.token?.code ?? 'XLM'}
+            detail={h.token?.name ?? 'Stellar Lumens'}
+            right={fmt(h.amount)}
+          />
+        ))
+      : (st?.activity ?? []).map((a) => <ActivityRow key={a.id} a={a} />);
+  // whole rows only: when they don't all fit, the last slot becomes "See all"
+  const fits = Math.max(1, Math.floor(space / ROW));
+  const shown = rows.length > fits ? rows.slice(0, fits - 1) : rows;
+  const more = rows.length > fits && (
+    <Row
+      key="more"
+      icon={tab === 'tokens' ? 'wallet-outline' : 'time-outline'}
+      title={tab === 'tokens' ? `See all ${rows.length} tokens` : 'See all activity'}
+      onPress={() => (tab === 'tokens' ? router.push('/tokens') : router.navigate('/activity'))}
+    />
+  );
+
   return (
     <Screen noHeader onRefresh={refresh}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
@@ -55,7 +83,7 @@ export default function Home() {
 
       {st && !st.backedUp && (
         <List>
-          <Row icon="alert-circle" tone="negative" title="Not backed up" detail="If this phone is lost, so is the wallet. Back up now." onPress={() => backUp(router)} />
+          <Row icon="alert-circle" tone="negative" title="Not backed up" detail="If this phone is lost, so is the wallet." onPress={() => backUp(router)} />
         </List>
       )}
 
@@ -70,14 +98,14 @@ export default function Home() {
         </View>
       </View>
 
-      <View style={[s.card, { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: Spacing.sm }]}>
+      <View style={{ flexDirection: 'row' }}>
         <Action icon="arrow-up" label="Send" disabled={!xlm} onPress={() => router.push('/send')} />
         <Action icon="arrow-down" label="Receive" onPress={() => router.push('/receive')} />
         <Action icon="add" label="Add token" disabled={!st?.opened} onPress={() => router.push('/tokens')} />
         {network === 'testnet' ? (
-          <Action icon="water-outline" label="Test XLM" disabled={st?.opened !== false} onPress={() => getTestXlm().then(refresh, (e) => setError(String(e)))} />
+          <Action icon="water" label="Test XLM" disabled={st?.opened !== false} onPress={() => getTestXlm().then(refresh, (e) => setError(String(e)))} />
         ) : (
-          <Action icon="shield-outline" label="Protect" onPress={() => router.push('/protect')} />
+          <Action icon="shield-checkmark" label="Protect" onPress={() => router.push('/protect')} />
         )}
       </View>
 
@@ -87,31 +115,33 @@ export default function Home() {
       <ErrorText>{error}</ErrorText>
 
       {st?.opened && (
-        <List label="TOKENS">
-          {st.holdings.map((h) => (
-            <Row key={h.token?.code ?? 'XLM'} badge={h.token ? h.token.code[0] : 'X'} title={h.token?.code ?? 'XLM'} detail={h.token?.name ?? 'Stellar Lumens'} right={fmt(h.amount)} />
-          ))}
-        </List>
-      )}
-
-      {!!st?.activity.length && (
-        <List label="RECENT ACTIVITY">
-          {st.activity.map((a) => (
-            <ActivityRow key={a.id} a={a} />
-          ))}
-          <Row title="See all" onPress={() => router.navigate('/activity')} />
-        </List>
+        <>
+          <Segmented options={[{ label: 'Tokens', value: 'tokens' }, { label: 'Activity', value: 'activity' }]} value={tab} onChange={setTab} />
+          <View style={{ flex: 1, minHeight: ROW }} onLayout={(e) => setSpace(e.nativeEvent.layout.height)}>
+            {rows.length ? (
+              <List>
+                {[...shown, more].filter(Boolean).map((r, i) => (
+                  <View key={i} style={{ height: ROW, justifyContent: 'center' }}>
+                    {r}
+                  </View>
+                ))}
+              </List>
+            ) : (
+              <Text style={Type.small}>No payments yet.</Text>
+            )}
+          </View>
+        </>
       )}
     </Screen>
   );
 }
 
-/** One quick action: round icon over a label. */
+/** One quick action: a green circle over a label. */
 function Action({ icon, label, disabled, onPress }: { icon: IconName; label: string; disabled?: boolean; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [{ flex: 1, alignItems: 'center', gap: 6 }, (disabled || pressed) && { opacity: 0.4 }]}>
-      <View style={[styles.action]}>
-        <Icon name={icon} color={Colors.primary} />
+      <View style={styles.action}>
+        <Icon name={icon} color={Colors.white} />
       </View>
       <Text style={[Type.small, { color: Colors.ink, fontWeight: '600' }]}>{label}</Text>
     </Pressable>
@@ -120,5 +150,5 @@ function Action({ icon, label, disabled, onPress }: { icon: IconName; label: str
 
 const styles = StyleSheet.create({
   chip: { fontSize: 12, fontFamily: 'monospace', color: Colors.white, backgroundColor: 'rgba(255,255,255,0.14)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.full, overflow: 'hidden' },
-  action: { width: 48, height: 48, borderRadius: Radius.full, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  action: { width: 52, height: 52, borderRadius: Radius.full, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
 });

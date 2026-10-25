@@ -6,11 +6,13 @@ import { Busy, Button, ErrorText, Intro, List, Row, Screen, SecretInput } from '
 import { Type } from '@/constants/theme';
 import { addTokenTx, knownTokens, server, spendable, type Token } from '@/lib/chain';
 import { cancelTap } from '@/lib/nfc';
-import { approve, getHoldings, getWallet, needsYubiKey } from '@/lib/stellar';
+import { fmt } from '@/components/activity-row';
+import { approve, getHoldings, getWallet, needsYubiKey, type Holding } from '@/lib/stellar';
 
 export default function Tokens() {
   const router = useRouter();
-  const [added, setAdded] = useState<string[]>();
+  const [held, setHeld] = useState<Holding[]>();
+  const added = held?.flatMap((h) => (h.token ? [h.token.issuer] : []));
   const [picked, setPicked] = useState<Token>();
   const [yubikey, setYubikey] = useState(false);
   const [canAfford, setCanAfford] = useState(true);
@@ -21,7 +23,7 @@ export default function Tokens() {
   useEffect(() => {
     (async () => {
       const w = (await getWallet())!;
-      setAdded((await getHoldings()).flatMap((h) => (h.token ? [h.token.code] : [])));
+      setHeld(await getHoldings());
       setYubikey(await needsYubiKey());
       setCanAfford(spendable(await server.getAccountEntry(w.account)) >= 0.5);
     })().catch((e) => setError(String(e)));
@@ -61,17 +63,24 @@ export default function Tokens() {
 
   return (
     <Screen>
+      {held && (
+        <List label="IN YOUR WALLET">
+          {held.map((h) => (
+            <Row key={h.token ? `${h.token.code}:${h.token.issuer}` : 'XLM'} badge={h.token ? h.token.code[0] : 'X'} title={h.token?.code ?? 'XLM'} detail={h.token?.name ?? 'Stellar Lumens'} right={fmt(h.amount)} />
+          ))}
+        </List>
+      )}
       <Intro>On Stellar anyone can make a token with any name, so Shards only lists ones from issuers it has checked.</Intro>
       {added && (
-        <List>
+        <List label="ADD A TOKEN">
           {knownTokens().map((t) => (
             <Row
               key={t.code}
               badge={t.code[0]}
               title={t.code}
               detail={t.name}
-              right={added.includes(t.code) ? 'Added' : undefined}
-              onPress={added.includes(t.code) ? undefined : () => setPicked(t)}
+              right={added.includes(t.issuer) ? 'Added' : undefined}
+              onPress={added.includes(t.issuer) ? undefined : () => setPicked(t)}
             />
           ))}
         </List>
