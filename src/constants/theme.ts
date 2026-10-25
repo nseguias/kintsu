@@ -58,7 +58,7 @@ export const Type = {
   small: { fontSize: 13, fontWeight: '400' as const, color: Colors.inkSoft },
   tiny: { fontSize: 11, fontWeight: '600' as const, color: Colors.inkFaint, letterSpacing: 0.3 },
   // serif numbers (amounts)
-  num: { fontFamily: Fonts.serif, color: Colors.ink, fontVariant: ['tabular-nums'] as const },
+  num: { fontFamily: Fonts.serif, color: Colors.ink, fontVariant: ['tabular-nums' as const] },
 };
 
 // curated, on-brand avatar palette (deep fir, terracotta, olive, clay, teal, plum)

@@ -19,11 +19,30 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-splash-screen", { "backgroundColor": "#F7F0D9", "android": { "image": "./assets/images/splash-icon.png", "imageWidth": 76 } }],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F0D9",
+          "android": {
+            "image": "./assets/images/splash-icon.png",
+            "imageWidth": 76
+          }
+        }
+      ],
       "expo-font",
       "expo-secure-store",
-      "react-native-nfc-manager"
+      "react-native-nfc-manager",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Shards uses the camera only to add randomness when you create a wallet. Photos are never saved.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
-    "experiments": { "typedRoutes": true, "reactCompiler": true }
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
   }
 }

@@ -1,43 +1,63 @@
-# Addendum: NFC recovery shards (build only after HACKATHON_SPEC §9 steps 1–7 are green)
+# Shards: wallet creation, backups and NFC recovery
 
-Answers the "no key recovery in v1" gap with 2-of-3 Shamir shards on NFC tags.
+Source of truth for the crypto in `packages/crypto`. Every rule here has a test in `packages/crypto/crypto.test.ts`.
 
-## Hardware facts
-- Tags available: **MIFARE Classic 1K** (ISO 14443-3A, NDEF-formatted, 716 B free, writable, cannot be locked). Its own crypto (Crypto-1) is broken; treat the tag as plain memory. All security comes from our encryption.
-- Android with an NXP NFC chip reads/writes it (the dev phone does). **iOS cannot read MIFARE Classic** → this feature is Android-only for the demo; state it in the README.
-- Library: `react-native-nfc-manager` (not in Expo Go → Android development build). Use the `Ndef` tech: `NfcManager.requestTechnology(NfcTech.Ndef)`, `Ndef.writeNdefMessage`, `NfcManager.getTag()` / `ndefMessage` to read.
+## Rules
+- Recovery phrases and secret keys are only ever written **by hand on paper**. No clipboard, no paste, no password managers, no screenshots, no network.
+- Every backup method is enough on its own; users may pick several (tags + paper phrase, etc.).
+- Only audited, widely used libraries: `@scure/bip39`, `@noble/hashes`, `@noble/ciphers`, `shamir-secret-sharing`, pinned to exact versions. Our own glue is pinned by official test vectors.
 
-## Crypto
-- Secret: the 32-byte ed25519 seed (`Keypair.rawSecretKey()`).
-- Split: `shamir-secret-sharing` (GF(256), audited, pure JS): `split(seed, 3, 2)` → three 33-byte shares. Restore: `combine([a, b])`.
-- Per-share encryption: `key = scrypt(pin, salt, { N: 2**15, r: 8, p: 1, dkLen: 32 })` (`@noble/hashes/scrypt`; ~1 s on a phone), then `xchacha20poly1305(key).encrypt(nonce, share, aad)` from `@noble/ciphers`, with `aad = "diablo-shard-v1" || idx || fp`.
-- Same `salt` and `pin` for all three shards (user sets one PIN/passphrase); different `nonce` per shard.
+## Creating a wallet
+User picks the phrase length (12 or 24 words), then the randomness source:
 
-## Tag payload (one NDEF URI record, so a tap deep-links into the app)
-`diablo://shard#<base64url(bytes)>` where bytes =
+| Source | Entropy | Reproducible |
+|---|---|---|
+| Random | `crypto.getRandomValues` (Android `SecureRandom`), 16 or 32 bytes | no |
+| Dice | **SeedSigner-exact**: `SHA-256(rolls as typed "1".."6")`, first 16 bytes for 12 words (50 rolls), all 32 for 24 words (99 rolls). Never mixed. | yes: same rolls → same words on SeedSigner or `echo -n <rolls> \| sha256sum` |
+| Camera | `h = SHA-256(32 random bytes)`, then `h = SHA-256(h ‖ photo)` for each of 2 photos, truncated. Weak photos (dark, uniform, near-duplicate) are rejected in the UI and retaken. | no (like SeedSigner) |
+
+Entropy → BIP39 words (`@scure/bip39`, English) → optional passphrase → **SEP-0005** key: BIP39 seed, then SLIP-10 ed25519 at `m/44'/148'/0'` → 32-byte ed25519 seed → `Keypair.fromRawEd25519Seed`.
+
+- Words → wallet works (import). Wallet (S… key) → words does not: derivation is one-way, and encoding a raw key as words would not be a standard phrase other wallets understand. Wallets imported from an S… key back up with tags or the S… key on paper.
+- A wrong passphrase silently opens a different, empty wallet. The UI says so.
+- Creating a phrase: shown once (airplane mode on), then the user picks 3 random words from 4 options each.
+
+## Hardware
+- Tags: **MIFARE Classic 1K** (NDEF-formatted, 716 B free, writable, can't be locked). Its own crypto (Crypto-1) is broken; treat the tag as plain memory. All security comes from our encryption.
+- Android with an NXP NFC chip reads/writes it. **iOS can't read MIFARE Classic**, so this is Android-only.
+- `react-native-nfc-manager` (Android development build), `NfcTech.Ndef`.
+
+## NFC shards
+The 32-byte ed25519 seed is split 2-of-3 (`shamir-secret-sharing`, GF(256)), so **any wallet can be exported to tags**, created or imported.
+
+Each tag gets one NDEF record (MIME `application/octet-stream`) holding 95 bytes:
 ```
-v(1)=1 | idx(1) 0..2 | k(1)=2 | n(1)=3 | fp(4)=sha256(pubkey)[0..4] | salt(16) | nonce(24) | ct(33+16)
+salt(16) ‖ nonce(24) ‖ XChaCha20-Poly1305_k( v(1)=1 ‖ idx(1) 0..2 ‖ fp(4) ‖ share(33) )   // +16 tag
+k  = scrypt(NFKC(pin), salt, N=2^15, r=8, p=1, dkLen=32)
+fp = SHA-256(ed25519 public key)[0..4]
 ```
-≈ 97 bytes raw, ≈ 130 chars base64url. Fits with room to spare.
+- **No clues**: version, index, 2-of-3 and the wallet fingerprint are inside the ciphertext. Each tag has its own salt and nonce, so a tag is indistinguishable from random bytes, and two tags can't be linked without the PIN. No app URI, no labels on the physical tags.
+- Cost of that: tapping a tag doesn't open the app, and restore runs scrypt once per tag (~1 s each).
+- Wrong PIN, tampering and "not one of our tags" give the same error.
 
-## App flows
-**Back up (Profile → "Back up wallet to tags")**
-1. Explain: "You'll need any 2 of the 3 tags plus your PIN to recover. Keep them in different places."
-2. Set PIN/passphrase (min 6 chars; warn that short PINs can be brute-forced by someone holding two tags).
-3. For idx in 0..2: "Tap tag N" → write → read back → compare bytes → ✅. Abort cleanly if a tag already holds a shard for a different `fp` (ask to overwrite).
-4. Mark `backedUp = true` in local settings; show date in Profile.
+## Flows
+**Back up (Profile → Back up to tags)**
+1. Explain: "Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places."
+2. PIN/passphrase, min 6 characters; warn that someone holding two tags can brute-force a short PIN.
+3. For each tag: "Hold tag N" → write → read back → compare bytes → ✅. If the tag already holds data, ask before overwriting.
+4. Store `backedUp` and the date locally; show it on Home.
 
-**Restore (Onboarding → "Restore from tags")**
-1. Enter PIN. 2. "Tap any shard tag" ×2: parse, check `v`, require both `fp` equal, reject duplicate `idx`. 3. Decrypt both (wrong PIN → AEAD failure → "Wrong PIN"). 4. `combine` → seed → derive keypair → assert `sha256(pubkey)[0..4] == fp`. 5. Store in SecureStore, continue to Home with existing balances loaded from chain.
+**Restore (first launch → Restore from tags)**
+1. Enter PIN. 2. Tap any tag, decrypt it; tap a second, decrypt it. 3. Reject the same tag twice and tags from different wallets. 4. Combine → seed → check `fp`. 5. Store in SecureStore and open Home.
 
 **Rotate / wipe**: "Overwrite tags" re-runs backup; "Erase tag" writes an empty NDEF message.
 
 ## Tests
-- Unit: split/combine round-trip; any 2 of 3 restore, 1 does not; wrong PIN fails; tampered byte fails AEAD; fp mismatch rejected; payload size < 716 B.
-- Manual: back up → clear app data → restore with tags 1+3 → same G-address.
+- Unit (`npm test`): SEP-0005 vectors 1–5 incl. passphrase; SeedSigner dice vectors (50 and 99 rolls); random/camera lengths and camera never repeating; any 2 of 3 restore; wrong PIN, tamper and garbage fail; same tag twice and mixed wallets rejected; short PIN rejected; 95 bytes < 716; no shared prefix across backups.
+- Manual: back up → clear app data → restore with tags 1 + 3 → same G-address.
 
 ## Security notes for the README
-- A stolen tag alone reveals nothing (ciphertext). Two tags + PIN = full control, so the PIN matters; recommend a passphrase.
-- Tags are cloneable; irrelevant because the payload is encrypted, but a cloned tag is as good as the original to whoever knows the PIN.
-- The seed passes through app memory during backup/restore only; never logged, never sent anywhere.
-- Demo scope: 2-of-3 on MIFARE Classic, Android. Production: NTAG216 (iOS-compatible), optional cloud-encrypted third shard.
+- One stolen tag reveals nothing and doesn't even say what it is. Two tags + PIN = full control, so recommend a passphrase-length PIN.
+- Tags are cloneable; irrelevant for secrecy, but a clone is as good as the original to whoever knows the PIN.
+- Secrets pass through app memory only during create/backup/restore; never logged, never sent anywhere.
+- Scope: 2-of-3 on MIFARE Classic, Android. Later: NTAG216 for iOS.

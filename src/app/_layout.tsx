@@ -21,7 +21,16 @@ export default function RootLayout() {
           headerTitleStyle: { fontWeight: '700' },
           contentStyle: { backgroundColor: Colors.background },
         }}>
-        <Stack.Screen name="index" options={{ title: 'NFC check' }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="welcome" options={{ headerShown: false }} />
+        <Stack.Screen name="create" options={{ title: 'Create a wallet' }} />
+        <Stack.Screen name="import" options={{ title: 'Import a wallet' }} />
+        <Stack.Screen name="backup" options={{ title: 'Back up your wallet' }} />
+        <Stack.Screen name="backup-phrase" options={{ title: 'Recovery phrase' }} />
+        <Stack.Screen name="verify" options={{ title: 'Check your paper' }} />
+        <Stack.Screen name="backup-key" options={{ title: 'Secret key' }} />
+        <Stack.Screen name="home" options={{ headerShown: false }} />
+        <Stack.Screen name="nfc-check" options={{ title: 'NFC check' }} />
       </Stack>
     </>
   );
