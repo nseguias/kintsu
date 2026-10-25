@@ -1,3 +1,4 @@
+import { scryptAsync } from '@noble/hashes/scrypt.js';
 import { Keypair } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 
@@ -13,6 +14,7 @@ import {
   stellarSeed,
   toMnemonic,
 } from './index';
+import { SCRYPT, scrypt } from './kdf';
 
 const keypair = (seed: Uint8Array) => Keypair.fromRawEd25519Seed(Buffer.from(seed));
 
@@ -173,9 +175,21 @@ describe('NFC shards', () => {
     const other = await Promise.all((await createShards(stellarSeed(SEP5[1].mnemonic), pin)).map((t) => openShard(t, pin)));
     await expect(combineShards(mine[0], mine[0])).rejects.toThrow('same tag twice');
     await expect(combineShards(mine[0], other[1])).rejects.toThrow('different wallets');
+    // writing new tags re-splits the same wallet: old + new must not silently give a wrong key
+    const newer = await Promise.all((await createShards(seed, pin)).map((t) => openShard(t, pin)));
+    await expect(combineShards(mine[0], newer[1])).rejects.toThrow('different backups');
+    await expect(combineShards(mine[0], newer[0])).rejects.toThrow('older backup');
   });
 
   it('refuses short PINs', async () => {
     await expect(createShards(seed, '12345')).rejects.toThrow('at least 6');
+  });
+});
+
+describe('scrypt', () => {
+  it('OpenSSL (Node / quick-crypto) and @noble/hashes agree on our parameters', async () => {
+    const salt = Uint8Array.from({ length: 16 }, (_, i) => i);
+    const noble = await scryptAsync('123456', salt, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p, dkLen: 32 });
+    expect(await scrypt('123456', salt)).toEqual(noble);
   });
 });

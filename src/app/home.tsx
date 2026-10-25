@@ -1,14 +1,16 @@
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { Button, Screen, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { startDraft } from '@/lib/draft';
 import { getBackups, getKeypair, getXlmBalance, type BackupRecord } from '@/lib/stellar';
 
 const LABEL: Record<BackupRecord['kind'], string> = { phrase: 'Recovery phrase on paper', key: 'Secret key on paper', tags: 'NFC tags' };
 
 export default function Home() {
+  const router = useRouter();
   const [address, setAddress] = useState('');
   const [balance, setBalance] = useState<number>();
   const [error, setError] = useState('');
@@ -60,6 +62,16 @@ export default function Home() {
           <Text style={Type.small}>If this phone is lost, so is the wallet.</Text>
         </View>
       )}
+
+      <Button
+        kind="secondary"
+        title={backups.some((b) => b.kind === 'tags') ? 'Write new NFC tags' : 'Back up to NFC tags'}
+        onPress={async () => {
+          // works for any wallet, created here or imported: tags hold the same key either way
+          startDraft({ rawSeed: (await getKeypair())!.rawSecretKey(), imported: false });
+          router.push('/backup-tags');
+        }}
+      />
 
       <View style={{ flex: 1, minHeight: Spacing.xl }} />
       <Link href="/nfc-check" style={[Type.small, { textAlign: 'center', padding: Spacing.md }]}>NFC test (dev)</Link>

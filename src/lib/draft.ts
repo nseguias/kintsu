@@ -11,7 +11,7 @@ export type Draft = {
   rawSeed?: Uint8Array; // set for an imported S… key
   passphrase: string;
   imported: boolean;
-  queue: ('phrase' | 'key')[]; // ponytail: 'tags' joins in step 4
+  queue: Backup[];
   done: Backup[];
 };
 
@@ -30,7 +30,7 @@ export function getDraft(): Draft {
 
 export const seedOf = (d: Draft) => d.rawSeed ?? stellarSeed(d.mnemonic!, d.passphrase);
 
-const ROUTES = { phrase: '/backup-phrase', key: '/backup-key' } as const;
+const ROUTES = { phrase: '/backup-phrase', key: '/backup-key', tags: '/backup-tags' } as const;
 
 /** Runs the chosen backups in order (phrase first: the passphrase changes the key), then saves the wallet. */
 export async function nextBackup(router: Router, finished?: Backup) {

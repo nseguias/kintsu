@@ -12,10 +12,11 @@ export default function BackupChoice() {
   const canPhrase = !!d.mnemonic && !d.imported; // an imported phrase is already on paper; an S… key has none
   const [phrase, setPhrase] = useState(canPhrase);
   const [key, setKey] = useState(false);
-  const n = Number(phrase) + Number(key);
+  const [tags, setTags] = useState(false);
+  const n = Number(phrase) + Number(key) + Number(tags);
 
   const go = () => {
-    d.queue = [...(phrase ? ['phrase' as const] : []), ...(key ? ['key' as const] : [])];
+    d.queue = [...(phrase ? ['phrase' as const] : []), ...(key ? ['key' as const] : []), ...(tags ? ['tags' as const] : [])];
     nextBackup(router);
   };
 
@@ -24,7 +25,7 @@ export default function BackupChoice() {
       <Text style={[Type.body, { color: Colors.inkSoft }]}>
         Pick one or more. Each one alone is enough to get your wallet back, so two is safer than one.
       </Text>
-      <Choice title="NFC tags" body="Split across 3 tags + a PIN. Any 2 restore it. Coming in the next step." selected={false} disabled onPress={() => {}} />
+      <Choice title="NFC tags" body="Split across 3 tags + a PIN. Any 2 restore it." selected={tags} onPress={() => setTags(!tags)} />
       <Choice
         title="Recovery phrase on paper"
         body={canPhrase ? `${d.mnemonic!.split(' ').length} words, written by hand. Works in other Stellar wallets.` : d.imported && d.mnemonic ? 'You already have it on paper.' : 'Not available for a wallet imported from an S… key.'}

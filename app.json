@@ -38,7 +38,8 @@
           "cameraPermission": "Shards uses the camera only to add randomness when you create a wallet. Photos are never saved.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "react-native-quick-crypto"
     ],
     "experiments": {
       "typedRoutes": true,

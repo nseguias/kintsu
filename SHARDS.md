@@ -5,7 +5,7 @@ Source of truth for the crypto in `packages/crypto`. Every rule here has a test 
 ## Rules
 - Recovery phrases and secret keys are only ever written **by hand on paper**. No clipboard, no paste, no password managers, no screenshots, no network.
 - Every backup method is enough on its own; users may pick several (tags + paper phrase, etc.).
-- Only audited, widely used libraries: `@scure/bip39`, `@noble/hashes`, `@noble/ciphers`, `shamir-secret-sharing`, pinned to exact versions. Our own glue is pinned by official test vectors.
+- Only audited, widely used libraries: `@scure/bip39`, `@noble/hashes`, `@noble/ciphers`, `shamir-secret-sharing`, and OpenSSL's scrypt via `react-native-quick-crypto` (pure-JS scrypt took ~2 min per tag on Hermes), pinned to exact versions. Our own glue is pinned by official test vectors.
 
 ## Creating a wallet
 User picks the phrase length (12 or 24 words), then the randomness source:
@@ -33,7 +33,7 @@ The 32-byte ed25519 seed is split 2-of-3 (`shamir-secret-sharing`, GF(256)), so 
 Each tag gets one NDEF record (MIME `application/octet-stream`) holding 95 bytes:
 ```
 salt(16) ‖ nonce(24) ‖ XChaCha20-Poly1305_k( v(1)=1 ‖ idx(1) 0..2 ‖ fp(4) ‖ share(33) )   // +16 tag
-k  = scrypt(NFKC(pin), salt, N=2^15, r=8, p=1, dkLen=32)
+k  = scrypt(NFKC(pin), salt, N=2^15, r=8, p=1, dkLen=32)   # OpenSSL; tests check it equals @noble/hashes
 fp = SHA-256(ed25519 public key)[0..4]
 ```
 - **No clues**: version, index, 2-of-3 and the wallet fingerprint are inside the ciphertext. Each tag has its own salt and nonce, so a tag is indistinguishable from random bytes, and two tags can't be linked without the PIN. No app URI, no labels on the physical tags.
@@ -41,11 +41,12 @@ fp = SHA-256(ed25519 public key)[0..4]
 - Wrong PIN, tampering and "not one of our tags" give the same error.
 
 ## Flows
-**Back up (Profile → Back up to tags)**
+**Back up (during create/import, or Home → Back up to NFC tags)**
 1. Explain: "Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places."
 2. PIN/passphrase, min 6 characters; warn that someone holding two tags can brute-force a short PIN.
 3. For each tag: "Hold tag N" → write → read back → compare bytes → ✅. If the tag already holds data, ask before overwriting.
-4. Store `backedUp` and the date locally; show it on Home.
+4. A tag already used in this run is refused. Store the date locally; show it on Home.
+5. Writing new tags makes a new split: old and new tags don't combine (restore says they're from different backups), so retire the old set.
 
 **Restore (first launch → Restore from tags)**
 1. Enter PIN. 2. Tap any tag, decrypt it; tap a second, decrypt it. 3. Reject the same tag twice and tags from different wallets. 4. Combine → seed → check `fp`. 5. Store in SecureStore and open Home.
