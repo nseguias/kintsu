@@ -1,15 +1,16 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ActivityRow, fmt } from '@/components/activity-row';
-import { ErrorText, Icon, List, Row, Screen, Segmented, s, type IconName } from '@/components/ui';
+import { fmt } from '@/components/activity-row';
+import { QrCode } from '@/components/qr';
+import { ErrorText, Icon, List, Row, Screen, s, type IconName } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
-import { accountExists, network, recentActivity, type Activity } from '@/lib/chain';
+import { accountExists, network } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
-import { getBackups, getHoldings, getTestXlm, getWallet, isProtected, keepProtection, type Holding } from '@/lib/stellar';
+import { getBackups, getHoldings, getTestXlm, getWallet, keepProtection, type Holding } from '@/lib/stellar';
 
-type Status = { holdings: Holding[]; opened: boolean; activity: Activity[]; backedUp: boolean; protectedNow: boolean };
+type Status = { holdings: Holding[]; opened: boolean; backedUp: boolean };
 const ROW = 72; // every row in the Home list is this tall, so we can show only the ones that fit whole
 
 export default function Home() {
@@ -17,7 +18,7 @@ export default function Home() {
   const [st, setSt] = useState<Status>();
   const [error, setError] = useState('');
   const [address, setAddress] = useState('');
-  const [tab, setTab] = useState<'tokens' | 'activity'>('tokens');
+  const [showQr, setShowQr] = useState(false);
   const [space, setSpace] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -27,11 +28,10 @@ export default function Home() {
       const w = (await getWallet())!;
       setAddress(w.account);
       await keepProtection(); // after a restore of a protected wallet: lock the old phone out
-      const [holdings, opened, activity] = await Promise.all([getHoldings(), accountExists(w.account), recentActivity(w.account, 20)]);
-      const now = (await getWallet())!;
-      setSt({ holdings, opened, activity, backedUp, protectedNow: isProtected(now) });
+      const [holdings, opened] = await Promise.all([getHoldings(), accountExists(w.account)]);
+      setSt({ holdings, opened, backedUp });
     } catch (e) {
-      setSt((old) => old ?? { holdings: [], opened: true, activity: [], backedUp, protectedNow: false });
+      setSt((old) => old ?? { holdings: [], opened: true, backedUp });
       setError(String(e).includes('Network') ? 'Can’t reach Stellar. Check your connection and pull down to refresh.' : String(e));
     }
   }, []);
@@ -40,30 +40,20 @@ export default function Home() {
   useFocusEffect(useCallback(() => void refresh(), [refresh]));
 
   const xlm = st?.holdings[0]?.amount;
-  const rows =
-    tab === 'tokens'
-      ? (st?.holdings ?? []).map((h) => (
-          <Row
-            key={h.token ? `${h.token.code}:${h.token.issuer}` : 'XLM'}
-            oneLine
-            badge={h.token ? h.token.code[0] : 'X'}
-            title={h.token?.code ?? 'XLM'}
-            detail={h.token?.name ?? 'Stellar Lumens'}
-            right={fmt(h.amount)}
-          />
-        ))
-      : (st?.activity ?? []).map((a) => <ActivityRow key={a.id} a={a} />);
+  const rows = (st?.holdings ?? []).map((h) => (
+    <Row
+      key={h.token ? `${h.token.code}:${h.token.issuer}` : 'XLM'}
+      oneLine
+      badge={h.token ? h.token.code[0] : 'X'}
+      title={h.token?.code ?? 'XLM'}
+      detail={h.token?.name ?? 'Stellar Lumens'}
+      right={fmt(h.amount)}
+    />
+  ));
   // whole rows only: when they don't all fit, the last slot becomes "See all"
   const fits = Math.max(1, Math.floor(space / ROW));
   const shown = rows.length > fits ? rows.slice(0, fits - 1) : rows;
-  const more = rows.length > fits && (
-    <Row
-      key="more"
-      icon={tab === 'tokens' ? 'wallet-outline' : 'time-outline'}
-      title={tab === 'tokens' ? `See all ${rows.length} tokens` : 'See all activity'}
-      onPress={() => (tab === 'tokens' ? router.push('/tokens') : router.navigate('/activity'))}
-    />
-  );
+  const more = rows.length > fits && <Row key="more" icon="wallet-outline" title={`See all ${rows.length} tokens`} onPress={() => router.push('/tokens')} />;
 
   return (
     <Screen noHeader onRefresh={refresh}>
@@ -88,15 +78,28 @@ export default function Home() {
       )}
 
       <View style={[s.card, { gap: 6, padding: Spacing.xl, borderRadius: Radius.xl, backgroundColor: Colors.primary, borderColor: Colors.primary }]}>
-        <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Balance</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[Type.small, { color: 'rgba(255,255,255,0.75)' }]}>Balance</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Show address as QR code" hitSlop={12} onPress={() => setShowQr(true)}>
+            <Icon name="qr-code-outline" color={Colors.white} />
+          </Pressable>
+        </View>
         <Text style={[Type.num, { fontSize: 44, color: Colors.white }]}>
           {xlm === undefined ? '…' : fmt(xlm)} <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.75)' }}>XLM</Text>
         </Text>
-        <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
-          {!!address && <Text style={styles.chip}>{address.slice(0, 4)}…{address.slice(-4)}</Text>}
-          {st?.protectedNow && <Text style={styles.chip}>Protected</Text>}
-        </View>
+        {!!address && <Text style={[styles.chip, { alignSelf: 'flex-start', marginTop: Spacing.sm }]}>{address.slice(0, 4)}…{address.slice(-4)}</Text>}
       </View>
+
+      <Modal visible={showQr && !!address} transparent animationType="fade" onRequestClose={() => setShowQr(false)}>
+        <Pressable accessibilityLabel="Close" onPress={() => setShowQr(false)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: Spacing.xl }}>
+          <View style={[s.card, { alignItems: 'center', gap: Spacing.lg, padding: Spacing.xl }]}>
+            <Text style={Type.title}>Your address</Text>
+            <QrCode value={address} size={240} />
+            <Text selectable style={[Type.mono, { textAlign: 'center' }]}>{address}</Text>
+            <Text style={Type.small}>Tap anywhere to close</Text>
+          </View>
+        </Pressable>
+      </Modal>
 
       <View style={{ flexDirection: 'row' }}>
         <Action icon="arrow-up" label="Send" disabled={!xlm} onPress={() => router.push('/send')} />
@@ -116,7 +119,7 @@ export default function Home() {
 
       {st?.opened && (
         <>
-          <Segmented options={[{ label: 'Tokens', value: 'tokens' }, { label: 'Activity', value: 'activity' }]} value={tab} onChange={setTab} />
+          <Text style={s.label}>TOKENS</Text>
           <View style={{ flex: 1, minHeight: ROW }} onLayout={(e) => setSpace(e.nativeEvent.layout.height)}>
             {rows.length ? (
               <List>
@@ -127,7 +130,7 @@ export default function Home() {
                 ))}
               </List>
             ) : (
-              <Text style={Type.small}>No payments yet.</Text>
+              <Text style={Type.small}>No tokens yet.</Text>
             )}
           </View>
         </>
