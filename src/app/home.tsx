@@ -62,9 +62,10 @@ export default function Home() {
             <Button title="Send" disabled={!balance} onPress={() => router.push('/send')} />
           </View>
           <View style={{ flex: 1 }}>
-            <Button kind="secondary" title="Refresh" onPress={refresh} />
+            <Button kind="secondary" title="Receive" onPress={() => router.push('/receive')} />
           </View>
         </View>
+        <Button kind="link" title="Refresh" onPress={refresh} />
       </View>
 
       <Text style={s.label}>BACKUPS</Text>

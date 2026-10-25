@@ -113,3 +113,25 @@ export async function configure(recovery: Keypair, device: string, cosigners: st
 export async function rekey(recovery: Keypair, device: string): Promise<void> {
   await configure(recovery, device, cosignersOf(await server.getAccountEntry(recovery.publicKey())));
 }
+
+export type PaymentRequest = { to: string; amount?: string; memo?: string };
+
+/**
+ * What a scanned QR asks for: a bare G… address, or a SEP-7 `web+stellar:pay?destination=…` link
+ * (amount and text memo carried over). Anything else, including an S… secret, gives null.
+ */
+export function parsePaymentQr(text: string): PaymentRequest | null {
+  const raw = text.trim();
+  if (StrKey.isValidEd25519PublicKey(raw.toUpperCase())) return { to: raw.toUpperCase() };
+  if (!raw.toLowerCase().startsWith('web+stellar:pay?')) return null;
+  const q = new URLSearchParams(raw.slice(raw.indexOf('?') + 1));
+  const to = q.get('destination') ?? '';
+  if (!StrKey.isValidEd25519PublicKey(to)) return null;
+  // ponytail: only text memos; exchanges using MEMO_ID need Memo.id support in Send first
+  const memoType = q.get('memo_type') ?? 'MEMO_TEXT';
+  if (q.get('memo') && memoType !== 'MEMO_TEXT') return null;
+  return { to, amount: q.get('amount') ?? undefined, memo: q.get('memo') ?? undefined };
+}
+
+/** SEP-7 link other wallets understand; what Receive shows as a QR. */
+export const paymentUri = (to: string) => `web+stellar:pay?destination=${to}`;

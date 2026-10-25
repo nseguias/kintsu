@@ -1,11 +1,12 @@
 import { StrKey, type Transaction } from '@stellar/stellar-sdk';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 
 import { Button, Screen, SecretInput, s } from '@/components/ui';
-import { Colors, Spacing, Type } from '@/constants/theme';
-import { accountExists, cosignersOf, needs2fa, paymentTx, server, spendable, submit } from '@/lib/chain';
+import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { accountExists, cosignersOf, needs2fa, parsePaymentQr, paymentTx, server, spendable, submit } from '@/lib/chain';
 import { getWallet } from '@/lib/stellar';
 import { signWithYubiKey } from '@/lib/yubikey';
 
@@ -21,9 +22,13 @@ export default function Send() {
   const [memo, setMemo] = useState('');
   const [review, setReview] = useState<{ tx: Transaction; creates: boolean; factors: string[] }>();
   const [pin, setPin] = useState('');
+  const [askPin, setAskPin] = useState(false);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState('');
+  const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
     getWallet().then(async (w) => {
@@ -74,10 +79,43 @@ export default function Send() {
     } catch (e) {
       // a half-signed transaction can't be retried as is; Review builds a fresh one
       setReview(undefined);
+      setAskPin(false);
+      setPin('');
       setError((e as Error).message || 'Lost the YubiKey. Hold it still and try again.');
     }
     setBusy('');
   };
+
+  const scanned = (data: string) => {
+    const req = parsePaymentQr(data);
+    if (!req) return setScanNote('That QR code isn’t a Stellar address. Try another.');
+    setTo(req.to);
+    if (req.amount) setAmount(req.amount);
+    if (req.memo) setMemo(req.memo);
+    setScanning(false);
+    setScanNote('');
+  };
+
+  if (scanning) {
+    return (
+      <Screen>
+        {!permission?.granted ? (
+          <Button title="Allow camera to scan" onPress={requestPermission} />
+        ) : (
+          <CameraView
+            style={{ flex: 1, borderRadius: Radius.lg }}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onBarcodeScanned={({ data }) => scanned(data)}
+          />
+        )}
+        <Text style={[Type.small, { textAlign: 'center', color: scanNote ? Colors.negative : Colors.inkSoft }]}>
+          {scanNote || 'Point the camera at the receiver’s QR code.'}
+        </Text>
+        <Button kind="secondary" title="Cancel" onPress={() => setScanning(false)} />
+      </Screen>
+    );
+  }
 
   if (busy) {
     return (
@@ -103,6 +141,19 @@ export default function Send() {
     );
   }
 
+  if (review && askPin) {
+    return (
+      <Screen>
+        <Text style={Type.title}>Your YubiKey PIN</Text>
+        <Text style={[Type.body, { color: Colors.inkSoft }]}>Then hold your YubiKey to the back of the phone to approve {amount} XLM.</Text>
+        <SecretInput secureTextEntry autoFocus placeholder="YubiKey PIN" value={pin} onChangeText={setPin} />
+        <View style={{ flex: 1 }} />
+        <Button title="Tap your YubiKey" disabled={pin.length < 6} onPress={send} />
+        <Button kind="link" title="Back" onPress={() => setAskPin(false)} />
+      </Screen>
+    );
+  }
+
   if (review) {
     return (
       <Screen>
@@ -116,16 +167,9 @@ export default function Send() {
           {review.creates && <Text style={[Type.small, { color: Colors.accent }]}>This address is new to Stellar; this payment opens its account.</Text>}
         </View>
         <Text style={Type.small}>Check the first and last characters of the address against where you copied it from.</Text>
-        {review.factors.length > 0 && (
-          <SecretInput secureTextEntry keyboardType="number-pad" placeholder="YubiKey PIN" value={pin} onChangeText={setPin} />
-        )}
         {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
         <View style={{ flex: 1 }} />
-        <Button
-          title={review.factors.length ? `Tap YubiKey and send ${amount} XLM` : `Send ${amount} XLM`}
-          disabled={review.factors.length > 0 && pin.length < 6}
-          onPress={send}
-        />
+        <Button title={`Send ${amount} XLM`} onPress={review.factors.length ? () => setAskPin(true) : send} />
         <Button kind="link" title="Change" onPress={() => setReview(undefined)} />
       </Screen>
     );
@@ -133,6 +177,7 @@ export default function Send() {
 
   return (
     <Screen>
+      <Button kind="secondary" title="Scan QR code" onPress={() => setScanning(true)} />
       <Text style={s.label}>TO</Text>
       <TextInput style={[s.input, { fontFamily: 'monospace' }]} value={to} onChangeText={setTo} placeholder="G…" autoCapitalize="characters" autoCorrect={false} multiline />
       <Text style={s.label}>AMOUNT (XLM)</Text>
