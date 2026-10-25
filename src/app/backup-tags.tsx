@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { Busy, Button, ErrorText, Intro, List, Row, Screen, SecretInput, s } from '@/components/ui';
+import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { getDraft, nextBackup, seedOf } from '@/lib/draft';
 import { TagError, cancelTap, writeVerified } from '@/lib/nfc';
@@ -52,7 +52,7 @@ export default function BackupTags() {
       cancelled.current = true;
       cancelTap();
     };
-    return <Screen><Busy message={busy} onCancel={shards ? cancel : undefined} /></Screen>;
+    return <Screen><Busy message={busy} hint={shards ? 'We write it, then read it back to check every byte.' : undefined} onCancel={shards ? cancel : undefined} /></Screen>;
   }
 
   if (!shards) {
@@ -76,17 +76,29 @@ export default function BackupTags() {
   const done = ids.length === 3;
   return (
     <Screen>
-      <List>
-        {[0, 1, 2].map((i) => (
-          <Row
-            key={i}
-            icon={i < ids.length ? 'checkmark-circle' : 'radio-button-off'}
-            tone={i < ids.length ? 'positive' : undefined}
-            title={`Tag ${i + 1}`}
-            right={i < ids.length ? 'Written and checked' : i === ids.length ? 'Next' : ''}
-          />
-        ))}
-      </List>
+      <Intro>Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.</Intro>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {[0, 1, 2].map((i) => {
+          const state = i < ids.length ? 'done' : i === ids.length ? 'next' : 'waiting';
+          return (
+            <View
+              key={i}
+              style={[
+                s.card,
+                { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: Spacing.sm, borderWidth: 2 },
+                state === 'done' && { borderColor: Colors.positive },
+                state === 'next' && { borderColor: Colors.primary },
+                state === 'waiting' && { backgroundColor: Colors.surfaceAlt, borderStyle: 'dashed', borderColor: '#CFC3A0' },
+              ]}>
+              <Icon name={state === 'done' ? 'checkmark' : state === 'next' ? 'radio-outline' : 'tablet-portrait-outline'} color={state === 'done' ? Colors.positive : state === 'next' ? Colors.primary : Colors.inkSoft} />
+              <Text style={Type.heading}>Tag {i + 1}</Text>
+              <Text style={[Type.small, { fontSize: 12 }, state === 'done' && { color: Colors.positive }, state === 'next' && { color: Colors.primary }]}>
+                {state === 'done' ? 'Verified' : state === 'next' ? 'Next' : 'Waiting'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
       {askOverwrite ? (
         <View style={[s.card, { gap: Spacing.sm }]}>
           <Text style={Type.heading}>This tag already has something on it</Text>

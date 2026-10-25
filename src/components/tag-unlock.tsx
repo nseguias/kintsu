@@ -56,10 +56,11 @@ export function TagUnlock({ intro, onSeed }: { intro: string; onSeed: (seed: Uin
         {[0, 1].map((i) => (
           <Row
             key={i}
-            icon={i === 0 && first ? 'checkmark-circle' : 'radio-button-off'}
+            icon={i === 0 && first ? 'checkmark' : 'radio-outline'}
             tone={i === 0 && first ? 'positive' : undefined}
+            active={i === Number(!!first) && !!pin}
             title={i ? 'Second tag' : 'First tag'}
-            right={i === 0 && first ? 'Unlocked' : ''}
+            right={i === 0 && first ? 'Unlocked' : i === Number(!!first) ? (i ? 'Tap any other tag' : 'Tap any tag') : ''}
           />
         ))}
       </List>

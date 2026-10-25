@@ -4,7 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { View } from 'react-native';
 
-import { Colors, Fonts } from '@/constants/theme';
+import { Header } from '@/components/ui';
+import { Colors } from '@/constants/theme';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({ Fraunces_600SemiBold, Fraunces_700Bold });
@@ -15,10 +16,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: Colors.background },
-          headerTintColor: Colors.ink,
-          headerTitleStyle: { fontFamily: Fonts.serif, fontSize: 20 },
+          header: ({ options, navigation, back }) => <Header title={options.title ?? ''} onBack={back ? navigation.goBack : undefined} />,
           contentStyle: { backgroundColor: Colors.background },
         }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -35,10 +33,8 @@ export default function RootLayout() {
         <Stack.Screen name="send" options={{ title: 'Send XLM' }} />
         <Stack.Screen name="receive" options={{ title: 'Receive' }} />
         <Stack.Screen name="tokens" options={{ title: 'Add a token' }} />
-        <Stack.Screen name="activity" options={{ title: 'Activity' }} />
         <Stack.Screen name="protect" options={{ title: 'Protection' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        <Stack.Screen name="home" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
     </>
   );

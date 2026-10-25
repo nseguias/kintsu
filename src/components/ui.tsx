@@ -6,6 +6,21 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 
+/** The top of every pushed screen: back chevron and a serif title (replaces the native header). */
+export function Header({ title, onBack }: { title: string; onBack?: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ paddingTop: insets.top + Spacing.sm, paddingHorizontal: Spacing.sm, paddingBottom: Spacing.xs, flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.background }}>
+      {onBack && (
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="chevron-back" />
+        </Pressable>
+      )}
+      <Text style={[Type.title, !onBack && { marginLeft: Spacing.md }]} numberOfLines={1}>{title}</Text>
+    </View>
+  );
+}
+
 /** `noHeader` screens pad under the status bar themselves; `onRefresh` adds pull-to-refresh. */
 export function Screen({ children, noHeader, onRefresh }: { children: React.ReactNode; noHeader?: boolean; onRefresh?: () => Promise<void> }) {
   const insets = useSafeAreaInsets();
@@ -49,13 +64,23 @@ export const Intro = ({ children }: { children: React.ReactNode }) => <Text styl
 
 export const ErrorText = ({ children }: { children?: string }) => (children ? <Text style={[Type.small, { color: Colors.negative }]}>{children}</Text> : null);
 
-/** Full-screen wait while the user holds a tag/YubiKey or the network works. */
-export function Busy({ message, onCancel }: { message: string; onCancel?: () => void }) {
+/** Full-screen wait while the user holds a tag/YubiKey (`hint` shows the phone) or the network works. */
+export function Busy({ message, hint, onCancel }: { message: string; hint?: string; onCancel?: () => void }) {
+  const tap = message.startsWith('Hold');
   return (
     <>
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: Spacing.lg }}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={[Type.heading, { textAlign: 'center' }]}>{message}</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 18 }}>
+        {tap ? (
+          <View style={[s.ring, { width: 180, height: 180 }]}>
+            <View style={[s.ring, { width: 120, height: 120, backgroundColor: 'rgba(15,61,46,0.16)' }]}>
+              <Icon name="phone-portrait-outline" color={Colors.primary} size={52} />
+            </View>
+          </View>
+        ) : (
+          <ActivityIndicator size="large" color={Colors.primary} />
+        )}
+        <Text style={[tap ? Type.title : Type.heading, { textAlign: 'center' }]}>{message}</Text>
+        {!!hint && <Text style={[Type.small, { textAlign: 'center', maxWidth: 280 }]}>{hint}</Text>}
       </View>
       {onCancel && <Button kind="secondary" title="Cancel" onPress={onCancel} />}
     </>
@@ -65,23 +90,34 @@ export function Busy({ message, onCancel }: { message: string; onCancel?: () => 
 export type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export const Icon = ({ name, color = Colors.ink, size = 22 }: { name: IconName; color?: string; size?: number }) => <Ionicons name={name} color={color} size={size} />;
 
-/** One line in a list card: icon, title, optional detail, and a chevron when it opens something. */
-export function Row({ icon, badge, title, detail, right, rightTone, tone, onPress }: { icon?: IconName; badge?: string; title: string; detail?: string; right?: string; rightTone?: 'positive'; tone?: 'positive' | 'negative' | 'accent'; onPress?: () => void }) {
+/**
+ * One line in a List card: icon or badge, title, optional detail, a value on the right, and a chevron
+ * when it opens something. `active` highlights the step happening now.
+ */
+export function Row({ icon, badge, badgeTone, title, detail, right, rightTone, tone, active, onPress }: {
+  icon?: IconName; badge?: IconName | string; badgeTone?: 'positive' | 'negative'; title: string; detail?: string; right?: string;
+  rightTone?: 'positive' | 'negative'; tone?: 'positive' | 'negative' | 'accent'; active?: boolean; onPress?: () => void;
+}) {
   const color = tone ? Colors[tone] : Colors.ink;
+  const badgeColor = badgeTone ? Colors[badgeTone] : Colors.primary;
   return (
-    <Pressable accessibilityRole={onPress ? 'button' : undefined} disabled={!onPress} onPress={onPress} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}>
-      {icon && <Icon name={icon} color={tone ? color : Colors.primary} />}
+    <Pressable
+      accessibilityRole={onPress ? 'button' : undefined}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [s.row, active && { backgroundColor: Colors.primarySoft }, pressed && { backgroundColor: Colors.surfaceAlt }]}>
+      {icon && <Icon name={icon} color={tone ? color : Colors.primary} size={24} />}
       {!!badge && (
-        <View style={{ width: 32, height: 32, borderRadius: Radius.full, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontWeight: '700', color: Colors.primary }}>{badge}</Text>
+        <View style={[s.badge, { backgroundColor: badgeTone ? Colors[`${badgeTone}Soft`] : Colors.primarySoft }]}>
+          {badge.length > 2 ? <Icon name={badge as IconName} color={badgeColor} size={20} /> : <Text style={{ fontWeight: '700', fontSize: 16, color: badgeColor }}>{badge}</Text>}
         </View>
       )}
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[Type.heading, tone === 'negative' && { color }]}>{title}</Text>
         {!!detail && <Text style={Type.small}>{detail}</Text>}
       </View>
-      {!!right && <Text style={[Type.body, rightTone && { color: Colors[rightTone] }]}>{right}</Text>}
-      {onPress && <Icon name="chevron-forward" color={Colors.inkFaint} size={18} />}
+      {!!right && <Text style={[Type.heading, { fontVariant: ['tabular-nums'] }, rightTone && { color: Colors[rightTone] }]}>{right}</Text>}
+      {onPress && !right && <Icon name="chevron-forward" color={Colors.inkFaint} size={18} />}
     </Pressable>
   );
 }
@@ -90,9 +126,9 @@ export function Row({ icon, badge, title, detail, right, rightTone, tone, onPres
 export function List({ label, children }: { label?: string; children: React.ReactNode }) {
   const rows = React.Children.toArray(children).filter(Boolean);
   return (
-    <View style={{ gap: Spacing.sm }}>
+    <View style={{ gap: 10 }}>
       {!!label && <Text style={s.label}>{label}</Text>}
-      <View style={[s.card, { paddingVertical: 0 }]}>
+      <View style={[s.card, { padding: 0, overflow: 'hidden' }]}>
         {rows.map((r, i) => (
           <View key={i} style={i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border }}>
             {r}
@@ -103,20 +139,25 @@ export function List({ label, children }: { label?: string; children: React.Reac
   );
 }
 
-/** A selectable card: radio or checkbox, depending on how the caller uses `selected`. */
-export function Choice({ title, body, selected, onPress, disabled, style }: { title: string; body?: string; selected: boolean; onPress: () => void; disabled?: boolean; style?: ViewStyle }) {
+/** A selectable card. Checkbox-style unless `compact` (small side-by-side cards: the border shows the pick). */
+export function Choice({ title, body, selected, onPress, disabled, tag, compact, style }: {
+  title: string; body?: string; selected: boolean; onPress: () => void; disabled?: boolean; tag?: string; compact?: boolean; style?: ViewStyle;
+}) {
   return (
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected, disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[s.card, { borderWidth: 2, borderColor: selected ? Colors.primary : Colors.border, flexDirection: 'row', gap: Spacing.sm }, disabled && { opacity: 0.45 }, style]}>
-      <View style={{ flex: 1 }}>
-        <Text style={Type.heading}>{title}</Text>
-        {!!body && <Text style={[Type.small, { marginTop: 4 }]}>{body}</Text>}
+      style={[s.card, { borderWidth: 2, borderColor: selected ? Colors.primary : Colors.border, flexDirection: 'row', gap: 14 }, compact && { padding: Spacing.md }, disabled && { opacity: 0.45 }, style]}>
+      {!compact && <Icon name={selected ? 'checkbox' : 'square-outline'} color={selected ? Colors.primary : Colors.inkFaint} size={24} />}
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+          <Text style={[Type.heading, compact && { fontSize: 15 }]}>{title}</Text>
+          {!!tag && <Text style={s.tag}>{tag}</Text>}
+        </View>
+        {!!body && <Text style={[Type.small, compact && { fontSize: 12 }]}>{body}</Text>}
       </View>
-      <Icon name={selected ? 'checkmark-circle' : 'ellipse-outline'} color={selected ? Colors.primary : Colors.inkFaint} />
     </Pressable>
   );
 }
@@ -182,15 +223,18 @@ export function OfflineOnly({ children }: { children: React.ReactNode }) {
 }
 
 export const s = StyleSheet.create({
-  screen: { padding: Spacing.lg, paddingBottom: Spacing.xxl, gap: Spacing.md, flexGrow: 1 },
+  screen: { paddingHorizontal: 20, paddingTop: Spacing.md, paddingBottom: Spacing.xxl, gap: Spacing.lg, flexGrow: 1 },
   card: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: Radius.lg, padding: Spacing.lg },
-  btn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 15, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+  btn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 16, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   btnSecondary: { backgroundColor: Colors.neutralChip },
   btnLink: { backgroundColor: 'transparent' },
   btnText: { color: Colors.white, fontWeight: '600', fontSize: 16 },
   segmented: { flexDirection: 'row', backgroundColor: Colors.neutralChip, borderRadius: Radius.full, padding: 4, gap: 4 },
   segment: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: Radius.full },
   input: { backgroundColor: Colors.card, borderColor: Colors.border, borderWidth: 1, borderRadius: Radius.md, padding: Spacing.md, ...Type.body },
-  label: { ...Type.tiny, marginTop: Spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: Spacing.md, minHeight: 56 },
+  label: { ...Type.tiny, color: Colors.inkSoft, marginTop: Spacing.xs },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: Spacing.lg, paddingVertical: 14, minHeight: 64 },
+  badge: { width: 40, height: 40, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  ring: { borderRadius: Radius.full, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  tag: { fontSize: 11, fontWeight: '600', color: Colors.white, backgroundColor: Colors.primary, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full, overflow: 'hidden' },
 });
