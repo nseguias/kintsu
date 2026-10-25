@@ -19,8 +19,8 @@ export default function NfcCheck() {
   const [text, setText] = useState('hello shards');
   const [status, setStatus] = useState('Idle');
   const [sim, setSim] = useState(false);
-  const [pin, setPin] = useState('123456'); // ponytail: testnet dev screen; factory-default OpenPGP PINs
-  const [adminPin, setAdminPin] = useState('12345678');
+  const [pin, setPin] = useState('');
+  const [adminPin, setAdminPin] = useState('');
   const [yubi, setYubi] = useState('');
   useEffect(() => void simulated.then(setSim), []);
 
@@ -51,13 +51,13 @@ export default function NfcCheck() {
       nativeScrypt('pleaseletmein', 'SodiumChloride', 32, { N: 16384, r: 8, p: 1 }, (e, k) => (e ? fail(e) : ok(k!.toString('hex')))),
     );
     const t = Date.now();
-    await scrypt('123456', new Uint8Array(16));
+    await scrypt('timing-check', new Uint8Array(16));
     const ms = Date.now() - t;
     return `${rfc === '7023bdcb3afd7348461c06cd81fd38ebfda8fbba904f8e3ea9b543f6545da1f2' ? '✅' : '❌'} RFC 7914 vector\n${ms} ms per tag (N=2^15)`;
   });
 
   const setup = run('YubiKey', async () => {
-    const address = await setupYubiKey(adminPin);
+    const address = await setupYubiKey(pin, adminPin || undefined);
     setYubi(address);
     return `YubiKey address\n${address}`;
   });
@@ -82,7 +82,7 @@ export default function NfcCheck() {
       <Pressable style={styles.btn} onPress={kdf}><Text style={styles.btnText}>Check scrypt</Text></Pressable>
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <TextInput style={[styles.input, { flex: 1 }]} value={pin} onChangeText={setPin} placeholder="PIN" />
-        <TextInput style={[styles.input, { flex: 1 }]} value={adminPin} onChangeText={setAdminPin} placeholder="Admin PIN" />
+        <TextInput style={[styles.input, { flex: 1 }]} value={adminPin} onChangeText={setAdminPin} placeholder="Admin PIN (new key only)" />
       </View>
       <Pressable style={styles.btn} onPress={setup}><Text style={styles.btnText}>Set up YubiKey</Text></Pressable>
       {!!yubi && <Pressable style={styles.btn} onPress={yubiPay}><Text style={styles.btnText}>Send 1 XLM signed by the YubiKey</Text></Pressable>}

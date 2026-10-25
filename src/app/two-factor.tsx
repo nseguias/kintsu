@@ -4,17 +4,25 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { TagUnlock } from '@/components/tag-unlock';
-import { Button, Screen, SecretInput, s } from '@/components/ui';
+import { Button, Screen, SecretInput } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { configure, cosignersOf, server } from '@/lib/chain';
 import { cancelTap } from '@/lib/nfc';
 import { getWallet, isRekeyed } from '@/lib/stellar';
-import { setupYubiKey } from '@/lib/yubikey';
+import { setupYubiKey, YubiKeyError } from '@/lib/yubikey';
+
+const Step = ({ n, title }: { n: 1 | 2; title: string }) => (
+  <View style={{ gap: 2 }}>
+    <Text style={[Type.tiny, { color: Colors.inkSoft }]}>STEP {n} OF 2</Text>
+    <Text style={Type.title}>{title}</Text>
+  </View>
+);
 
 export default function TwoFactor() {
   const router = useRouter();
   const [pin, setPin] = useState('');
   const [adminPin, setAdminPin] = useState('');
+  const [needsAdmin, setNeedsAdmin] = useState(false);
   const [yubikey, setYubikey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -24,10 +32,11 @@ export default function TwoFactor() {
     setError('');
     setBusy(true);
     try {
-      setYubikey(await setupYubiKey(adminPin, pin));
+      setYubikey(await setupYubiKey(pin, adminPin || undefined));
       setPin('');
       setAdminPin('');
     } catch (e) {
+      if (e instanceof YubiKeyError && e.code === 'needsAdmin') setNeedsAdmin(true);
       setError((e as Error).message || 'Lost the YubiKey. Hold it still and try again.');
     }
     setBusy(false);
@@ -50,7 +59,7 @@ export default function TwoFactor() {
         <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.md }}>
           <Text style={[Type.title, { textAlign: 'center' }]}>2FA is on ✓</Text>
           <Text style={[Type.body, { textAlign: 'center' }]}>
-            Every payment now needs this phone and a tap of your YubiKey. Lost the YubiKey? Your tags can turn 2FA off.
+            From now on, every payment needs this phone and a tap of your YubiKey. If you lose the YubiKey, your tags can turn 2FA off.
           </Text>
         </View>
         <Button title="Done" onPress={() => router.back()} />
@@ -73,29 +82,29 @@ export default function TwoFactor() {
   if (yubikey) {
     return (
       <Screen>
-        <View style={[s.card, { gap: 4 }]}>
-          <Text style={Type.heading}>YubiKey ready ✓</Text>
-          <Text style={[Type.small, { fontFamily: 'monospace' }]}>{yubikey}</Text>
-        </View>
-        <TagUnlock intro="Last step: only your recovery key can change who signs. Tap 2 of your tags to confirm." onSeed={turnOn} />
+        <Step n={2} title="Confirm with your tags" />
+        <Text style={[Type.small, { color: Colors.positive }]}>YubiKey ready ✓</Text>
+        <TagUnlock
+          intro="Only your tags can change who signs for this wallet. Type the PIN you chose for your tags, then hold 2 of your tags to the phone, one after the other."
+          onSeed={turnOn}
+        />
       </Screen>
     );
   }
 
   return (
     <Screen>
+      <Step n={1} title="Your YubiKey" />
       <Text style={[Type.body, { color: Colors.inkSoft }]}>
-        After this, sending needs this phone plus a tap of your YubiKey. A thief with just your phone can’t send.
+        Every payment will need this phone and a tap of your YubiKey. Your other YubiKey logins (Gmail, X…) aren’t touched.
       </Text>
-      <Text style={Type.small}>
-        Shards uses the YubiKey’s OpenPGP app only. Your other uses (Gmail, X and other security-key logins) are separate and stay untouched.
-      </Text>
-      <SecretInput secureTextEntry keyboardType="number-pad" placeholder="YubiKey PIN (factory default 123456)" value={pin} onChangeText={setPin} />
-      <SecretInput secureTextEntry keyboardType="number-pad" placeholder="Admin PIN (factory default 12345678)" value={adminPin} onChangeText={setAdminPin} />
-      <Text style={Type.small}>The admin PIN is only needed the first time, to create the key.</Text>
-      {!!error && <Text style={[Type.small, { color: Colors.negative }]}>{error}</Text>}
+      <SecretInput secureTextEntry keyboardType="number-pad" placeholder="YubiKey PIN" value={pin} onChangeText={setPin} />
+      {needsAdmin && (
+        <SecretInput secureTextEntry keyboardType="number-pad" placeholder="YubiKey admin PIN" value={adminPin} onChangeText={setAdminPin} />
+      )}
+      {!!error && <Text style={[Type.small, { color: needsAdmin && !adminPin ? Colors.inkSoft : Colors.negative }]}>{error}</Text>}
       <View style={{ flex: 1 }} />
-      <Button title="Tap your YubiKey" disabled={pin.length < 6} onPress={tapYubiKey} />
+      <Button title="Tap your YubiKey" disabled={pin.length < 6 || (needsAdmin && adminPin.length < 8)} onPress={tapYubiKey} />
     </Screen>
   );
 }

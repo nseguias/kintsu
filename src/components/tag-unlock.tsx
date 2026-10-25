@@ -63,7 +63,7 @@ export function TagUnlock({ intro, onSeed }: { intro: string; onSeed: (seed: Uin
   return (
     <>
       <Text style={[Type.body, { color: Colors.inkSoft }]}>{intro}</Text>
-      {!first && <SecretInput secureTextEntry placeholder="Tags PIN" value={pin} onChangeText={setPin} />}
+      {!first && <SecretInput secureTextEntry placeholder="PIN you chose for your tags" value={pin} onChangeText={setPin} />}
       {[0, 1].map((i) => (
         <View key={i} style={[s.card, { flexDirection: 'row', justifyContent: 'space-between' }]}>
           <Text style={Type.heading}>{i ? 'Second tag' : 'First tag'}</Text>

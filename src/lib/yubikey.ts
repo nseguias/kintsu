@@ -8,7 +8,11 @@ import { simulated } from '@/lib/nfc';
 // from the Mac with gpg-connect-agent. Only the OpenPGP *signing* slot is ever touched; FIDO
 // (Gmail/X logins), OTP, PIV and OATH are separate apps these commands can't reach.
 
-export class YubiKeyError extends Error {}
+export class YubiKeyError extends Error {
+  constructor(message: string, public code?: 'needsAdmin') {
+    super(message);
+  }
+}
 
 type Send = (apdu: number[]) => Promise<number[]>;
 
@@ -82,30 +86,29 @@ async function checkPin(send: Send, pw: 0x81 | 0x83, pin: string) {
 let simKey: Keypair | undefined;
 
 /**
- * One tap: returns the YubiKey's Stellar address. Creates the Ed25519 signing key only if the
- * OpenPGP signing slot is empty; an existing Ed25519 key is reused; any other key is refused.
+ * One tap: returns the YubiKey's Stellar address and checks its PIN, so 2FA is never turned on with a
+ * PIN that then fails at send time. An existing Ed25519 key is reused; any other key is refused.
+ * Only an empty slot needs the admin PIN (to create the key); without it this throws `needsAdmin`.
  */
-export async function setupYubiKey(adminPin: string, pin?: string): Promise<string> {
+export async function setupYubiKey(pin: string, adminPin?: string): Promise<string> {
   if (await simulated) return (simKey ??= Keypair.random()).publicKey();
   return session(async (send) => {
     const existing = await readSigningKey(send);
-    // also check the signing PIN now, so 2FA is never turned on with a PIN that then fails at send time
-    if (existing?.recorded) {
-      if (pin) await checkPin(send, 0x81, pin);
-      return StrKey.encodeEd25519PublicKey(Buffer.from(existing.pub));
-    }
-    await checkPin(send, 0x83, adminPin);
     let pub = existing?.pub;
-    if (!pub) {
-      await send(putData(0xc1, ED25519_ATTRIBUTES));
-      pub = Uint8Array.from(tlv(await send(GENERATE_SIGNING_KEY), 0x86) ?? []);
-      if (pub.length !== 32) throw new YubiKeyError('The YubiKey didn’t return a key. Try again.');
+    if (!pub || (!existing!.recorded && adminPin)) {
+      if (!adminPin) throw new YubiKeyError('This YubiKey has no Shards key yet. Its admin PIN lets Shards create one.', 'needsAdmin');
+      await checkPin(send, 0x83, adminPin);
+      if (!pub) {
+        await send(putData(0xc1, ED25519_ATTRIBUTES));
+        pub = Uint8Array.from(tlv(await send(GENERATE_SIGNING_KEY), 0x86) ?? []);
+        if (pub.length !== 32) throw new YubiKeyError('The YubiKey didn’t return a key. Try again.');
+      }
+      // record fingerprint + creation time so gpg and other tools see this slot as taken
+      const created = Math.floor(Date.now() / 1000);
+      await send(putData(0xc7, ed25519Fingerprint(pub, created)));
+      await send(putData(0xce, [created >>> 24, (created >>> 16) & 255, (created >>> 8) & 255, created & 255]));
     }
-    // record fingerprint + creation time so gpg and other tools see this slot as taken
-    const created = Math.floor(Date.now() / 1000);
-    await send(putData(0xc7, ed25519Fingerprint(pub, created)));
-    await send(putData(0xce, [created >>> 24, (created >>> 16) & 255, (created >>> 8) & 255, created & 255]));
-    if (pin) await checkPin(send, 0x81, pin);
+    await checkPin(send, 0x81, pin);
     return StrKey.encodeEd25519PublicKey(Buffer.from(pub));
   });
 }
