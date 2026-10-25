@@ -38,7 +38,8 @@ export default function Home() {
   useFocusEffect(useCallback(() => void refresh(), [refresh]));
 
   const xlm = st?.holdings[0]?.amount;
-  const rows = (st?.holdings ?? []).map((h) => (
+  // tokens at 0 stay listed under Tokens (See all / Add token), not here; XLM always shows
+  const rows = (st?.holdings ?? []).filter((h) => !h.token || h.amount > 0).map((h) => (
     <Row
       key={h.token ? `${h.token.code}:${h.token.issuer}` : 'XLM'}
       oneLine
@@ -51,7 +52,7 @@ export default function Home() {
   // whole rows only: when they don't all fit, the last slot becomes "See all"
   const fits = Math.max(1, Math.floor(space / ROW));
   const shown = rows.length > fits ? rows.slice(0, fits - 1) : rows;
-  const more = rows.length > fits && <Row key="more" icon="wallet-outline" title={`See all ${rows.length} tokens`} onPress={() => router.push('/tokens')} />;
+  const more = rows.length > fits && <Row key="more" icon="wallet-outline" title={`See all ${st!.holdings.length} tokens`} onPress={() => router.push('/tokens')} />;
 
   return (
     <Screen noHeader onRefresh={refresh}>
@@ -81,10 +82,9 @@ export default function Home() {
           {xlm === undefined ? '…' : fmt(xlm)} <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.75)' }}>XLM</Text>
         </Text>
         {!!address && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Show your address and QR code" onPress={() => router.push('/receive')} style={({ pressed }) => [styles.chip, pressed && { opacity: 0.6 }]}>
+          <View style={styles.chip}>
             <Text style={styles.chipText}>{address.slice(0, 4)}…{address.slice(-4)}</Text>
-            <Icon name="qr-code-outline" color={Colors.white} size={16} />
-          </Pressable>
+          </View>
         )}
       </View>
 
