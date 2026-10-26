@@ -1,8 +1,9 @@
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Button, Intro, OfflineOnly, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { getDraft } from '@/lib/draft';

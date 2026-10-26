@@ -15,6 +15,8 @@ export const Colors = {
   // accent — terracotta, used sparingly for small actions
   accent: '#C8643E',
   accentSoft: 'rgba(200,100,62,0.12)',
+  // gold — only for the logo's kintsugi seams
+  gold: '#C9A13B',
   // semantics — green = owed to you, terracotta = you owe
   positive: '#1F7A3E',
   positiveSoft: 'rgba(31,122,62,0.12)',
@@ -24,12 +26,7 @@ export const Colors = {
   white: '#FFFFFF',
 };
 
-/** Font families. Serif (Fraunces) for display + numbers; system sans for UI text. */
-export const Fonts = {
-  serif: 'Fraunces_600SemiBold',
-  serifBold: 'Fraunces_700Bold',
-};
-
+/** Fraunces everywhere: Text/TextInput from @/components/text pick its file from fontWeight. */
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -48,19 +45,19 @@ export const Radius = {
 };
 
 export const Type = {
-  // serif display
-  hero: { fontFamily: Fonts.serif, fontSize: 52, color: Colors.ink },
-  display: { fontFamily: Fonts.serif, fontSize: 34, color: Colors.ink },
-  title: { fontFamily: Fonts.serif, fontSize: 22, color: Colors.ink },
-  // sans UI
+  // display
+  hero: { fontSize: 52, fontWeight: '600' as const, color: Colors.ink },
+  display: { fontSize: 34, fontWeight: '600' as const, color: Colors.ink },
+  title: { fontSize: 22, fontWeight: '600' as const, color: Colors.ink },
+  // UI
   heading: { fontSize: 17, fontWeight: '600' as const, color: Colors.ink },
   body: { fontSize: 15, fontWeight: '400' as const, color: Colors.ink },
   small: { fontSize: 13, fontWeight: '400' as const, color: Colors.inkSoft },
   tiny: { fontSize: 11, fontWeight: '600' as const, color: Colors.inkFaint, letterSpacing: 0.3 },
   // addresses, keys, hashes
   mono: { fontFamily: 'monospace', fontSize: 15, color: Colors.ink },
-  // serif numbers (amounts)
-  num: { fontFamily: Fonts.serif, color: Colors.ink, fontVariant: ['tabular-nums' as const] },
+  // numbers (amounts)
+  num: { fontWeight: '600' as const, color: Colors.ink, fontVariant: ['tabular-nums' as const] },
 };
 
 // curated, on-brand avatar palette (deep fir, terracotta, olive, clay, teal, plum)

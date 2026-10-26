@@ -2,8 +2,9 @@ import { wordlist } from '@crypto/mnemonic';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Button, Intro, Screen } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { getDraft, nextBackup } from '@/lib/draft';

@@ -1,7 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Alert, Text } from 'react-native';
+import { Alert } from 'react-native';
 
+import { Text } from '@/components/text';
 import { ErrorText, List, Row, Screen, Segmented, s } from '@/components/ui';
 import { Type } from '@/constants/theme';
 import { network, type Currency, type Network } from '@/lib/chain';
@@ -30,7 +31,7 @@ export default function Settings() {
   const switchTo = (n: Network) => {
     const go = () => setNetwork(n).then(() => setNet(n), (e) => setError(e.message));
     if (n === 'testnet') return go();
-    Alert.alert('Use mainnet?', 'Mainnet XLM is real money. Shards is in beta: start with small amounts.', [
+    Alert.alert('Use mainnet?', 'Mainnet XLM is real money. Kintsu is in beta: start with small amounts.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Use mainnet', onPress: go },
     ]);

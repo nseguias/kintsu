@@ -45,9 +45,9 @@ export async function readRecords(): Promise<{ id?: string; techTypes?: string[]
 
 export const textOf = (r: NdefRecord) => Ndef.text.decodePayload(Uint8Array.from(r.payload));
 
-/** Shown to the user as-is. `code` lets the screen react (e.g. offer to overwrite). */
+/** Shown to the user as-is. */
 export class TagError extends Error {
-  constructor(public code: 'used' | 'hasData' | 'mismatch', message: string) {
+  constructor(public code: 'used' | 'mismatch', message: string) {
     super(message);
   }
 }
@@ -58,11 +58,10 @@ const sameBytes = (a: ArrayLike<number>, b: ArrayLike<number>) => a.length === b
 const isShard = (r: NdefRecord) => Ndef.isType(r, Ndef.TNF_MIME_MEDIA, MIME);
 
 /**
- * One tap: refuses a tag listed in `usedIds` or (unless `overwrite`) one that already holds data,
- * writes `payload` as a single generic MIME record, then reads the tag back and compares bytes.
+ * One tap: refuses a tag listed in `usedIds`, overwrites whatever else the tag holds, writes `payload` as a single generic MIME record, then reads the tag back and compares bytes.
  * Returns the tag id.
  */
-export async function writeVerified(payload: Uint8Array, usedIds: string[], overwrite: boolean): Promise<string> {
+export async function writeVerified(payload: Uint8Array, usedIds: string[]): Promise<string> {
   // application/octet-stream: says nothing about what the bytes are or which app wrote them
   const bytes = Ndef.encodeMessage([Ndef.record(Ndef.TNF_MIME_MEDIA, MIME, [], Array.from(payload))]) as number[];
   if (await simulated) {
@@ -73,7 +72,6 @@ export async function writeVerified(payload: Uint8Array, usedIds: string[], over
     const tag = await NfcManager.getTag();
     const id = tag?.id ?? '';
     if (usedIds.includes(id)) throw new TagError('used', 'You already used this tag. Take a new one.');
-    if (!overwrite && tag?.ndefMessage?.length) throw new TagError('hasData', 'This tag already has something on it.');
     await NfcManager.ndefHandler.writeNdefMessage(bytes, { reconnectAfterWrite: true });
     const back = (await NfcManager.ndefHandler.getNdefMessage())?.ndefMessage ?? [];
     if (back.length !== 1 || !isShard(back[0]) || !sameBytes(back[0].payload, payload)) {

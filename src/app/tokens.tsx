@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Busy, Button, ErrorText, Intro, List, Row, Screen, SecretInput } from '@/components/ui';
 import { Type } from '@/constants/theme';
 import { addTokenTx, knownTokens, server, spendable, type Token } from '@/lib/chain';
@@ -70,7 +71,7 @@ export default function Tokens() {
           ))}
         </List>
       )}
-      <Intro>On Stellar anyone can make a token with any name, so Shards only lists ones from issuers it has checked.</Intro>
+      <Intro>On Stellar anyone can make a token with any name, so Kintsu only lists ones from issuers it has checked.</Intro>
       {added && (
         <List label="ADD A TOKEN">
           {knownTokens().map((t) => (

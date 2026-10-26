@@ -1,8 +1,9 @@
 import { Keypair, type xdr } from '@stellar/stellar-sdk';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { TagUnlock } from '@/components/tag-unlock';
 import { Busy, Button, Choice, ErrorText, Intro, List, Row, Screen, SecretInput } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';

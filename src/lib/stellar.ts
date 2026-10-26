@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import type { Transaction } from '@stellar/stellar-sdk';
 
-import { accountExists, configure, cosignersOf, horizonUrl, isConfigured, knownTokens, needs2fa, network, priceIn, server, signersOf, selectNetwork, submit, type Currency, type Network, type Token } from '@/lib/chain';
+import { accountExists, configure, getTestXlm as testXlm, cosignersOf, horizonUrl, isConfigured, knownTokens, needs2fa, network, priceIn, server, signersOf, selectNetwork, submit, type Currency, type Network, type Token } from '@/lib/chain';
 import { signWithYubiKey } from '@/lib/yubikey';
 
 const SIGNER_KEY = 'stellar.secret'; // what this phone signs with: the recovery key until protected, then its device key
@@ -114,11 +114,8 @@ export async function getBackups(): Promise<BackupRecord[]> {
   return JSON.parse((await SecureStore.getItemAsync(BACKUPS_KEY)) ?? '[]');
 }
 
-/** Testnet only: Friendbot opens the account with 10,000 test XLM. It only funds new accounts. */
-export async function getTestXlm(): Promise<void> {
-  if (network !== 'testnet') throw new Error('Test XLM is only for testnet.');
-  await server.fundAddress((await requireWallet()).account);
-}
+/** Testnet only: 10,000 test XLM for a wallet that isn't open yet. */
+export const getTestXlm = async () => testXlm((await requireWallet()).account);
 
 /** Native balance in XLM, read over RPC; 0 until the account's first deposit (it doesn't exist before). */
 export async function getXlmBalance(): Promise<number> {
@@ -152,7 +149,7 @@ export type Holding = { token?: Token; amount: number }; // no token = XLM
 
 /**
  * Everything this wallet holds, read from the ledger (XLM first): whatever is in the account shows,
- * added here or not. Tokens Shards hasn't checked are marked so a look-alike "USDC" can't pass as Circle's.
+ * added here or not. Tokens Kintsu hasn't checked are marked so a look-alike "USDC" can't pass as Circle's.
  */
 export async function getHoldings(): Promise<Holding[]> {
   const address = (await requireWallet()).account;

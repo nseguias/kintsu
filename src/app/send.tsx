@@ -2,8 +2,9 @@ import { StrKey, type Transaction } from '@stellar/stellar-sdk';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { fmt } from '@/components/activity-row';
 import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, Segmented, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -50,7 +51,7 @@ export default function Send() {
     dest && !StrKey.isValidEd25519PublicKey(dest) ? 'That isn’t a Stellar address (G…, 56 characters).'
     : dest === account ? 'That’s this wallet’s own address.'
     : amount && !AMOUNT.test(amount) ? 'Use a number with up to 7 decimals.'
-    : amount && max !== undefined && Number(amount) > max ? `You can send up to ${max.toLocaleString(undefined, { maximumFractionDigits: 7 })} ${code}.`
+    : amount && max !== undefined && Number(amount) > max ? `You can send up to ${max.toLocaleString('en-US', { maximumFractionDigits: 7 })} ${code}.`
     : memoBytes(memo) > 28 ? 'The memo can be at most 28 characters.'
     : '';
   const ready = !problem && StrKey.isValidEd25519PublicKey(dest) && Number(amount) > 0;
@@ -184,7 +185,7 @@ export default function Send() {
       </View>
       {max !== undefined && (
         <Text style={Type.small}>
-          Available: {max.toLocaleString(undefined, { maximumFractionDigits: 7 })} {code}
+          Available: {max.toLocaleString('en-US', { maximumFractionDigits: 7 })} {code}
           {!token && xlmHeld > 0 && ` · ${fmt(xlmHeld)} XLM stays aside: Stellar’s deposit for this wallet, its keys and tokens`}
         </Text>
       )}

@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { getNetworkStateAsync } from 'expo-network';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View, type TextInputProps, type ViewStyle } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 
 /** The top of every pushed screen: back chevron and a serif title (replaces the native header). */
@@ -47,14 +49,36 @@ export function Screen({ children, noHeader, onRefresh }: { children: React.Reac
   );
 }
 
-export function Button({ title, onPress, kind = 'primary', disabled }: { title: string; onPress: () => void; kind?: 'primary' | 'secondary' | 'link'; disabled?: boolean }) {
+/**
+ * `busy` is true from the tap until `onPress` finishes (sync or async): show a spinner so slow work never
+ * looks frozen. The handler runs a frame later: heavy sync work (hashing photos, deriving keys) blocks JS,
+ * and the spinner must be on screen before it starts. Android's spinner keeps turning on the UI thread.
+ */
+export function useBusy(onPress: () => unknown) {
+  const [busy, setBusy] = useState(false);
+  const press = async () => {
+    setBusy(true);
+    try {
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+      await onPress();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return [busy, press] as const;
+}
+
+export function Button({ title, onPress, kind = 'primary', disabled }: { title: string; onPress: () => unknown; kind?: 'primary' | 'secondary' | 'link'; disabled?: boolean }) {
+  const [busy, press] = useBusy(onPress);
+  const color = kind === 'primary' ? Colors.white : Colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
-      onPress={onPress}
+      accessibilityState={{ busy, disabled }}
+      disabled={disabled || busy}
+      onPress={press}
       style={[s.btn, kind === 'secondary' && s.btnSecondary, kind === 'link' && s.btnLink, disabled && { opacity: 0.4 }]}>
-      <Text style={[s.btnText, kind !== 'primary' && { color: Colors.primary }]}>{title}</Text>
+      {busy ? <ActivityIndicator color={color} /> : <Text style={[s.btnText, { color }]}>{title}</Text>}
     </Pressable>
   );
 }
@@ -71,11 +95,7 @@ export function Busy({ message, hint, onCancel }: { message: string; hint?: stri
     <>
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 18 }}>
         {tap ? (
-          <View style={[s.ring, { width: 180, height: 180 }]}>
-            <View style={[s.ring, { width: 120, height: 120, backgroundColor: 'rgba(15,61,46,0.16)' }]}>
-              <Icon name="phone-portrait-outline" color={Colors.primary} size={52} />
-            </View>
-          </View>
+          <Breathing />
         ) : (
           <ActivityIndicator size="large" color={Colors.primary} />
         )}
@@ -87,7 +107,32 @@ export function Busy({ message, hint, onCancel }: { message: string; hint?: stri
   );
 }
 
-export type IconName = React.ComponentProps<typeof Ionicons>['name'];
+/** Two rings around a buzzing phone, slowly breathing in and out while we wait for a tap. */
+function Breathing() {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const ease = Easing.inOut(Easing.sin);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(t, { toValue: 1, duration: 1800, easing: ease, useNativeDriver: true }),
+        Animated.timing(t, { toValue: 0, duration: 1800, easing: ease, useNativeDriver: true }),
+      ]),
+    );
+    AccessibilityInfo.isReduceMotionEnabled().then((still) => !still && loop.start());
+    return () => loop.stop();
+  }, [t]);
+  const breathe = (from: number, to: number) => ({ transform: [{ scale: t.interpolate({ inputRange: [0, 1], outputRange: [from, to] }) }] });
+  return (
+    <View style={{ width: 200, height: 200, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[s.ring, { position: 'absolute', width: 180, height: 180 }, breathe(0.92, 1.08), { opacity: t.interpolate({ inputRange: [0, 1], outputRange: [1, 0.6] }) }]} />
+      <Animated.View style={[s.ring, { width: 120, height: 120, backgroundColor: 'rgba(15,61,46,0.16)' }, breathe(0.97, 1.03)]}>
+        <MaterialCommunityIcons name="vibrate" color={Colors.primary} size={52} />
+      </Animated.View>
+    </View>
+  );
+}
+
+export type IconName =React.ComponentProps<typeof Ionicons>['name'];
 export const Icon = ({ name, color = Colors.ink, size = 22 }: { name: IconName; color?: string; size?: number }) => <Ionicons name={name} color={color} size={size} />;
 
 /**

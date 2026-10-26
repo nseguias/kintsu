@@ -41,6 +41,31 @@ export async function submit(tx: Transaction): Promise<void> {
   if (done.status !== 'SUCCESS') throw new Error(`Transaction ${done.status}`);
 }
 
+const FRIENDBOT_TIMEOUT = 30_000;
+/** Testnet only: Friendbot opens a new account with 10,000 test XLM (once per address). Errors are worded for the user. */
+export async function getTestXlm(address: string): Promise<void> {
+  if (network !== 'testnet') throw new Error('Test XLM is only for testnet.');
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), FRIENDBOT_TIMEOUT);
+  let res: Response;
+  try {
+    res = await fetch(`https://friendbot.stellar.org/?addr=${address}`, { signal: abort.signal });
+  } catch {
+    throw new Error(abort.signal.aborted
+      ? 'Friendbot didn’t answer in 30 seconds. It’s often slow; try again in a minute.'
+      : 'Couldn’t reach Friendbot. Check your connection and try again.');
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.ok) return;
+  if (res.status === 429) {
+    const wait = Number(res.headers.get('retry-after'));
+    throw new Error(`Friendbot is busy. Try again in ${wait > 0 ? `${Math.ceil(wait)} seconds` : 'a minute'}.`);
+  }
+  const detail = ((await res.json().catch(() => ({}))) as { detail?: string }).detail;
+  throw new Error(`Friendbot couldn’t send test XLM${detail ? `: ${detail}` : ` (error ${res.status})`}.`);
+}
+
 export async function accountExists(address: string): Promise<boolean> {
   try {
     await server.getAccountEntry(address);
@@ -133,7 +158,7 @@ export const protectionMinimum = (entry: xdr.AccountEntry | null, cosigners: num
   (2 + (entry ? entry.numSubEntries - signersOf(entry).length : 0) + 1 + cosigners) * 0.5 + 0.01;
 
 /**
- * Tokens Shards offers. On Stellar anyone can issue a token called "USDC", so a token is code +
+ * Tokens Kintsu offers. On Stellar anyone can issue a token called "USDC", so a token is code +
  * issuer, and we only list issuers we checked (Circle's docs, 2026-10-25).
  */
 export type Token = { code: string; issuer: string; name: string };

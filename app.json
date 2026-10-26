@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Shards",
+    "name": "Kintsu",
     "slug": "shards",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -35,7 +35,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Shards uses the camera only to add randomness when you create a wallet. Photos are never saved.",
+          "cameraPermission": "Kintsu uses the camera only to add randomness when you create a wallet. Photos are never saved.",
           "recordAudioAndroid": false
         }
       ],

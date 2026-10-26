@@ -1,7 +1,7 @@
 import { Keypair, Operation } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { addTokenTx, priceIn, configure, cosignersOf, isConfigured, knownTokens, needs2fa, newTx, server, signersOf, submit, tokenBalance } from './chain';
+import { addTokenTx, getTestXlm, priceIn, configure, cosignersOf, isConfigured, knownTokens, needs2fa, newTx, server, signersOf, submit, tokenBalance } from './chain';
 
 // what protecting a (new) phone does: this phone in, every other phone out, second factors kept
 const rekey = async (recovery: Keypair, device: string) =>
@@ -19,6 +19,13 @@ describe.skipIf(!process.env.TESTNET)('keys on testnet', () => {
     signers.forEach((k) => tx.sign(k));
     return submit(tx);
   };
+
+  it('test XLM: opens a new account once, then says why not', async () => {
+    const account = Keypair.random().publicKey();
+    await getTestXlm(account);
+    expect(Number((await server.getAccountEntry(account)).balance)).toBe(10_000 * 1e7);
+    await expect(getTestXlm(account)).rejects.toThrow('Friendbot couldn’t send test XLM: account already funded');
+  }, 120_000);
 
   it('phone pays alone, never changes keys; restore swaps phones', async () => {
     const recovery = Keypair.random();

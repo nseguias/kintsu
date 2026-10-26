@@ -3,8 +3,9 @@ import { Keypair, StrKey } from '@stellar/stellar-sdk';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Button, ErrorText, OfflineOnly, Screen, Segmented, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { backUpUnlocked, startDraft } from '@/lib/draft';

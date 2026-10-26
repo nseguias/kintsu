@@ -4,8 +4,9 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Button, ErrorText, Screen, Segmented, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { startDraft } from '@/lib/draft';

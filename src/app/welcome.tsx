@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Text } from '@/components/text';
+import { Logo } from '@/components/logo';
 import { Intro, Screen, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 
@@ -18,8 +20,9 @@ export default function Welcome() {
   const router = useRouter();
   return (
     <Screen noHeader>
-      <View style={{ marginTop: 64, gap: Spacing.lg }}>
-        <Text style={[Type.display, { fontSize: 44 }]}>Shards</Text>
+      <View style={{ marginTop: 40, gap: Spacing.lg }}>
+        <Logo size={112} />
+        <Text style={[Type.display, { fontSize: 44 }]}>Kintsu</Text>
         <Intro>A Stellar wallet you can always get back: on paper, on NFC tags, or both.</Intro>
       </View>
       <View style={{ flex: 1 }} />

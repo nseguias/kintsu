@@ -1,4 +1,4 @@
-import { Fraunces_600SemiBold, Fraunces_700Bold, useFonts } from '@expo-google-fonts/fraunces';
+import { Fraunces_400Regular, Fraunces_600SemiBold, Fraunces_700Bold, useFonts } from '@expo-google-fonts/fraunces';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
@@ -8,7 +8,7 @@ import { Header } from '@/components/ui';
 import { Colors } from '@/constants/theme';
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ Fraunces_600SemiBold, Fraunces_700Bold });
+  const [fontsLoaded] = useFonts({ Fraunces_400Regular, Fraunces_600SemiBold, Fraunces_700Bold });
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: Colors.background }} />;
 
   return (

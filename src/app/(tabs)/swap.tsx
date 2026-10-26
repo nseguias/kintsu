@@ -1,7 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { Text, TextInput } from '@/components/text';
 import { fmt } from '@/components/activity-row';
 import { Busy, Button, ErrorText, Icon, Screen, SecretInput, Segmented, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -122,7 +123,7 @@ export default function Swap() {
         </Text>
         {!!q && (
           <Text style={Type.small}>
-            1 {fromCode} ≈ {(q.amount / Number(amount)).toLocaleString(undefined, { maximumSignificantDigits: 4 })} {toCode} · at least {fmt(q.amount * (1 - SLIPPAGE))} {toCode}
+            1 {fromCode} ≈ {(q.amount / Number(amount)).toLocaleString('en-US', { maximumSignificantDigits: 4 })} {toCode} · at least {fmt(q.amount * (1 - SLIPPAGE))} {toCode}
           </Text>
         )}
       </View>

@@ -66,7 +66,7 @@ async function readSigningKey(send: Send): Promise<{ pub: Uint8Array; recorded: 
   if (pub?.length === 32) return { pub: Uint8Array.from(pub), recorded: fingerprint.some((b) => b !== 0) };
   // anything else in the slot (an RSA/ECC key, or a fingerprint gpg recorded) is someone's key: hands off
   if (pub || fingerprint.some((b) => b !== 0)) {
-    throw new YubiKeyError('This YubiKey’s OpenPGP signing slot already holds a different key. Shards won’t touch it.');
+    throw new YubiKeyError('This YubiKey’s OpenPGP signing slot already holds a different key. Kintsu won’t touch it.');
   }
   return null;
 }
@@ -96,7 +96,7 @@ export async function setupYubiKey(pin: string, adminPin?: string): Promise<stri
     const existing = await readSigningKey(send);
     let pub = existing?.pub;
     if (!pub || (!existing!.recorded && adminPin)) {
-      if (!adminPin) throw new YubiKeyError('This YubiKey has no Shards key yet. Its admin PIN lets Shards create one.', 'needsAdmin');
+      if (!adminPin) throw new YubiKeyError('This YubiKey has no Kintsu key yet. Its admin PIN lets Kintsu create one.', 'needsAdmin');
       await checkPin(send, 0x83, adminPin);
       if (!pub) {
         await send(putData(0xc1, ED25519_ATTRIBUTES));

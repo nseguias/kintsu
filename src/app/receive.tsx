@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Share, Text, useWindowDimensions, View } from 'react-native';
+import { Share, useWindowDimensions, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { QrCode } from '@/components/qr';
 import { Button, Screen, s } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';

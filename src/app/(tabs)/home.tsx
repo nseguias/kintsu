@@ -1,9 +1,11 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { fmt, money } from '@/components/activity-row';
-import { ErrorText, Icon, List, Row, Screen, s, type IconName } from '@/components/ui';
+import { Logo } from '@/components/logo';
+import { ErrorText, Icon, useBusy, List, Row, Screen, s, type IconName } from '@/components/ui';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, network, type Currency } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
@@ -67,7 +69,11 @@ export default function Home() {
   return (
     <Screen noHeader onRefresh={refresh}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-        <Text style={[Type.title, { flex: 1 }]}>Shards</Text>
+        {/* the logo's drawing sits in a padded 200-box; pull it in so it lines up with the page edge */}
+        <View style={{ marginHorizontal: -13, marginVertical: -18 }}>
+          <Logo size={72} once />
+        </View>
+        <Text style={[Type.display, { flex: 1 }]}>Kintsu</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={`Network: ${network}`} onPress={() => router.navigate('/settings')}>
           <Text
             style={[
@@ -112,7 +118,7 @@ export default function Home() {
         <Action icon="arrow-down" label="Receive" onPress={() => router.push('/receive')} />
         <Action icon="add" label="Add token" disabled={!st?.opened} onPress={() => router.push('/tokens')} />
         {network === 'testnet' ? (
-          <Action icon="water" label="Test XLM" disabled={st?.opened !== false} onPress={() => getTestXlm().then(refresh, (e) => setError(String(e)))} />
+          <Action icon="water" label="Test XLM" disabled={st?.opened !== false} onPress={() => getTestXlm().then(refresh, (e) => setError((e as Error).message))} />
         ) : (
           <Action icon="shield-checkmark" label="Protect" onPress={() => router.push('/protect')} />
         )}
@@ -146,11 +152,12 @@ export default function Home() {
 }
 
 /** One quick action: a green circle over a label. */
-function Action({ icon, label, disabled, onPress }: { icon: IconName; label: string; disabled?: boolean; onPress: () => void }) {
+function Action({ icon, label, disabled, onPress }: { icon: IconName; label: string; disabled?: boolean; onPress: () => unknown }) {
+  const [busy, press] = useBusy(onPress);
   return (
-    <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => [{ flex: 1, alignItems: 'center', gap: 6 }, (disabled || pressed) && { opacity: 0.4 }]}>
+    <Pressable accessibilityRole="button" accessibilityState={{ busy, disabled }} disabled={disabled || busy} onPress={press} style={({ pressed }) => [{ flex: 1, alignItems: 'center', gap: 6 }, (disabled || pressed) && { opacity: 0.4 }]}>
       <View style={styles.action}>
-        <Icon name={icon} color={Colors.white} />
+        {busy ? <ActivityIndicator color={Colors.white} /> : <Icon name={icon} color={Colors.white} />}
       </View>
       <Text style={[Type.small, { color: Colors.ink, fontWeight: '600' }]}>{label}</Text>
     </Pressable>

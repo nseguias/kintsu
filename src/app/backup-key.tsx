@@ -2,8 +2,9 @@ import { Keypair } from '@stellar/stellar-sdk';
 import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Button, Intro, OfflineOnly, Screen, SecretInput, s } from '@/components/ui';
 import { Type } from '@/constants/theme';
 import { getDraft, nextBackup, seedOf } from '@/lib/draft';
