@@ -28,7 +28,8 @@ export default function BackupTags() {
   // tags read back in the final check, by position (0-2) in the set just written
   const [tested, setTested] = useState<{ id: string; index: number; shard: Shard }[]>([]);
   const [recoverable, setRecoverable] = useState(false);
-  const [skipped, setSkipped] = useState(false); // the check is recommended, not required
+  const [testing, setTesting] = useState(false); // the test is its own step, started with a button
+  const [skipped, setSkipped] = useState(false); // the test is recommended, not required
   useEffect(() => () => void cancelTap(), []);
 
   const lock = async () => {
@@ -104,9 +105,9 @@ export default function BackupTags() {
   useEffect(() => {
     if (!shards || busy || paused) return;
     if (ids.length < 3) void write();
-    else if (!recoverable && !skipped) void check();
+    else if (testing && !recoverable && !skipped) void check();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- write reads the same state; rerun only when these change
-  }, [shards, ids, busy, paused, tested, recoverable, skipped]);
+  }, [shards, ids, busy, paused, tested, recoverable, skipped, testing]);
 
   if (busy) {
     const cancel = () => {
@@ -121,9 +122,9 @@ export default function BackupTags() {
     if (!shards) return <Screen><Busy message={busy} /></Screen>;
     return (
       <Screen>
-        <Intro>{ids.length < 3 ? 'Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.' : 'Recommended: tap each tag once more, in any order, to prove they bring your wallet back.'}</Intro>
+        <Intro>{ids.length < 3 ? 'Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.' : 'Testing your tags: tap each one again, in any order. We rebuild your wallet from them, like a restore would.'}</Intro>
         <Tags written={ids.length} tested={tested.map((t) => t.index)} tapping />
-        <Busy message={busy} hint={ids.length < 3 ? 'We write it, then read it back to check every byte before moving on.' : 'We rebuild your wallet from them, like a restore would.'} onCancel={ids.length < 3 ? cancel : undefined} />
+        <Busy message={busy} hint={ids.length < 3 ? 'We write it, then read it back to check every byte before moving on.' : undefined} onCancel={ids.length < 3 ? cancel : undefined} />
         {ids.length === 3 && <Button kind="link" title="Skip the test, I’m in a hurry" onPress={skip} />}
       </Screen>
     );
@@ -159,6 +160,12 @@ export default function BackupTags() {
           <Text style={Type.small}>We rebuilt your wallet from every pair of them with your PIN. Any 2 of the 3 bring it back.</Text>
         </View>
       )}
+      {ids.length === 3 && !testing && !done && (
+        <View style={[s.card, { gap: 4 }]}>
+          <Text style={Type.heading}>All 3 tags are written</Text>
+          <Text style={Type.small}>Recommended: test them now. You tap each tag once more and we rebuild your wallet from them, so you know any 2 bring it back.</Text>
+        </View>
+      )}
       {done && (
         <Intro>Keep the 3 tags in 3 different places. Don’t write anything on them: a blank tag gives no clue it belongs to a wallet.</Intro>
       )}
@@ -167,8 +174,14 @@ export default function BackupTags() {
         <Button title="Done" onPress={() => nextBackup(router, 'tags')} />
       ) : (
         <>
-          <Button title={ids.length < 3 ? `Try tag ${ids.length + 1} again` : 'Continue the test'} onPress={() => (ids.length < 3 ? write() : check())} />
-          {ids.length === 3 && <Button kind="link" title="Skip the test" onPress={() => { setSkipped(true); pinFor.current = ''; }} />}
+          {ids.length < 3 ? (
+            <Button title={`Try tag ${ids.length + 1} again`} onPress={write} />
+          ) : testing ? (
+            <Button title="Continue the test" onPress={check} />
+          ) : (
+            <Button title="Test my tags" onPress={() => setTesting(true)} />
+          )}
+          {ids.length === 3 && <Button kind="link" title="Skip the test, I’m in a hurry" onPress={() => { setSkipped(true); pinFor.current = ''; }} />}
         </>
       )}
     </Screen>
