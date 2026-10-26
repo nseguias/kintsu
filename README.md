@@ -6,6 +6,8 @@ Any 2 of the 3 tags plus your PIN bring the wallet back. One tag alone is random
 
 Built at HackMeridian 2026 Lisbon (Genesis path, Stellar Composed + Stellar Unlocked).
 
+[Pitch deck (PDF)](docs/kintsu-deck.pdf) · [Android APK](../../releases/latest)
+
 ## Why
 
 People lose crypto in two ways: they get hacked, or they lose their keys.
