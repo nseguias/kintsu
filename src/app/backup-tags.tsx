@@ -193,16 +193,15 @@ function Tags({ written, tested, tapping }: { written: number; tested: number[];
               // explicit solid: Android keeps a dashed border after the style that set it is gone
               { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: Spacing.sm, borderWidth: 2, borderStyle: 'solid' },
               state === 'done' && { borderColor: Colors.positive, backgroundColor: Colors.positiveSoft },
-              state === 'written' && { borderColor: Colors.positive },
-              state === 'next' && { borderColor: Colors.primary },
+              state === 'next' && { borderColor: Colors.primary, backgroundColor: Colors.primary },
               state === 'waiting' && { backgroundColor: Colors.surfaceAlt, borderStyle: 'dashed', borderColor: '#CFC3A0' },
             ]}>
             <Icon
               name={state === 'done' ? 'shield-checkmark' : state === 'written' ? 'checkmark' : state === 'next' ? 'radio-outline' : 'tablet-portrait-outline'}
-              color={state === 'done' || state === 'written' ? Colors.positive : state === 'next' ? Colors.primary : Colors.inkSoft}
+              color={state === 'done' || state === 'written' ? Colors.positive : state === 'next' ? Colors.white : Colors.inkSoft}
             />
-            <Text style={Type.heading}>Tag {i + 1}</Text>
-            <Text style={[Type.small, { fontSize: 12 }, (state === 'done' || state === 'written') && { color: Colors.positive }, state === 'next' && { color: Colors.primary }]}>
+            <Text style={[Type.heading, state === 'next' && { color: Colors.white }]}>Tag {i + 1}</Text>
+            <Text style={[Type.small, { fontSize: 12 }, (state === 'done' || state === 'written') && { color: Colors.positive }, state === 'next' && { color: Colors.white }]}>
               {state === 'done' ? 'Tested' : state === 'written' ? 'Written' : state === 'next' ? (tapping ? 'Tap now' : 'Next') : 'Waiting'}
             </Text>
           </View>
