@@ -117,13 +117,6 @@ export async function getBackups(): Promise<BackupRecord[]> {
 /** Testnet only: 10,000 test XLM for a wallet that isn't open yet. */
 export const getTestXlm = async () => testXlm((await requireWallet()).account);
 
-/** Native balance in XLM, read over RPC; 0 until the account's first deposit (it doesn't exist before). */
-export async function getXlmBalance(): Promise<number> {
-  const address = (await requireWallet()).account;
-  if (!(await accountExists(address))) return 0;
-  return Number((await server.getAccountEntry(address)).balance) / 1e7; // stroops → XLM; fine for display
-}
-
 /** Whether this wallet's payments (and token changes) need a YubiKey tap right now. */
 export async function needsYubiKey(): Promise<boolean> {
   const w = await requireWallet();

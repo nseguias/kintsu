@@ -4,9 +4,9 @@ import type { Ndef as NdefT } from 'react-native-nfc-manager';
 // @ts-expect-error untyped deep import
 import NdefLib from 'react-native-nfc-manager/dist/ndef-lib/index.js';
 
-const Ndef = NdefLib as typeof NdefT;
-
 import { SHARD_BYTES, createShards } from './shards';
+
+const Ndef = NdefLib as typeof NdefT;
 
 describe('tag record', () => {
   it('a shard survives NDEF encode/decode byte for byte, as a clue-free MIME record', async () => {

@@ -1,4 +1,4 @@
-# Shards: wallet creation, backups and NFC recovery
+# Kintsu: wallet creation, backups and NFC recovery
 
 Source of truth for the crypto in `packages/crypto`. Every rule here has a test in `packages/crypto/crypto.test.ts`.
 
@@ -41,12 +41,13 @@ fp = SHA-256(ed25519 public key)[0..4]
 - Wrong PIN, tampering and "not one of our tags" give the same error.
 
 ## Flows
-**Back up (during create/import, or Home → Back up to NFC tags)**
+**Back up (during create/import, or Settings → Add a backup)**
 1. Explain: "Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places."
 2. PIN/passphrase, min 6 characters; warn that someone holding two tags can brute-force a short PIN.
-3. For each tag: "Hold tag N" → write → read back → compare bytes → ✅. If the tag already holds data, ask before overwriting.
-4. A tag already used in this run is refused. Store the date locally; show it on Home.
-5. Writing new tags makes a new split: old and new tags don't combine (restore says they're from different backups), so retire the old set.
+3. For each tag: "Hold tag N" → write → read back → compare bytes → ✅. The next tag's wait starts on its own; a tag that already holds data is overwritten.
+4. Recommended, skippable test: tap each tag again in any order. Each must be one of the 3 just written and open with the PIN, then every pair must rebuild the seed. Catches one tag written over three times.
+5. A tag already used in this run is waited out (it's usually still on the phone). Store the date locally; show it on Home.
+6. Writing new tags makes a new split: old and new tags don't combine (restore says they're from different backups), so retire the old set.
 
 **Restore (first launch → Restore from tags)**
 1. Enter PIN. 2. Tap any tag, decrypt it; tap a second, decrypt it. 3. Reject the same tag twice and tags from different wallets. 4. Combine → seed → check `fp`. 5. Store in SecureStore and open Home.
@@ -54,9 +55,9 @@ fp = SHA-256(ed25519 public key)[0..4]
 **Rotate / wipe**: "Overwrite tags" re-runs backup; "Erase tag" writes an empty NDEF message.
 
 ## Keys, weights and protection
-- **Recovery key** = the wallet's own key (phrase, paper S… key, tags); the G… address is always its. **Phone key** = random, only in this phone's SecureStore. **Second factors** = the YubiKey (OpenPGP Ed25519 key, over NFC) and later the helper service.
+- **Recovery key** = the wallet's own key (phrase, paper S… key, tags); the G… address is always its. **Phone key** = random, only in this phone's SecureStore. **Second factors** = the YubiKey (OpenPGP Ed25519 key, over NFC). Only the YubiKey for now.
 - **Simple by default:** after creating/importing/restoring, the phone holds the recovery key and can do everything, like a normal wallet. Nothing happens on-chain on its own.
-- **Protect (optional, Home → Protect this wallet):** one recovery-signed transaction adds a phone key (and optionally the YubiKey), then the recovery key is deleted from the phone. No tags needed, since the phone still holds the recovery key. Needs a backup first and enough XLM for the reserves: (2 + 1 + factors) × 0.5 XLM (`protectionMinimum`).
+- **Protect (optional, Home → Unprotected card or Settings):** one recovery-signed transaction adds a phone key (and optionally the YubiKey), then the recovery key is deleted from the phone. No tags needed, since the phone still holds the recovery key. Needs a backup first and enough XLM for the reserves: (2 + 1 + factors) × 0.5 XLM (`protectionMinimum`).
 - Weights double as roles (`src/lib/chain.ts`): recovery 5, phone 2, second factor 1. Thresholds: low 1, medium 2 without 2FA / 3 with it, high 5.
   - Sending: phone alone (2) without 2FA; with 2FA phone + one factor (3). Factors without the phone (1 + 1) never reach 3.
   - Changing keys: only the recovery key; phone + every factor is 4 < 5. On a protected phone that means 2 tags + PIN (add a YubiKey, turn 2FA off).
@@ -65,7 +66,7 @@ fp = SHA-256(ed25519 public key)[0..4]
 - **Adding a backup on a protected phone:** 2 tags + PIN (or the paper, typed offline) bring the recovery key back in memory for that one backup; the phone keeps only its own key. The 12/24 words can't be re-made from the key, so new backups are tags or the S… key.
 
 ## Home, tokens, history
-- Home (no tab bar, per the UX review): backup warning only while there's no backup, balance with Send/Receive, TOKENS (XLM + added tokens, "Add a token"), RECENT ACTIVITY (5 rows, "See all"). Protection lives in Settings; a shield next to the gear shows it's on.
+- Tabs: Home, Activity, Swap, Settings. Home: "Not backed up" while there's no backup, "Unprotected" while an unprotected wallet holds funds, balance with Send/Receive/Add token/Test XLM, TOKENS. Settings shows Protected/Unprotected.
 - Tokens = code + issuer; only Circle's USDC and EURC (issuers checked against Circle's docs) are offered. Adding one is a trustline (0.5 XLM reserve) and is approved like a payment (phone, + YubiKey with 2FA). Tokens only go to accounts that added them.
 - History reads Horizon (RPC has no per-account history); rows open stellar.expert.
 

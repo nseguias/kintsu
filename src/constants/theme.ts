@@ -10,14 +10,13 @@ export const Colors = {
   inkFaint: '#A39C82',
   // brand — deep fir green is the primary (FAB, selected, primary buttons)
   primary: '#0F3D2E',
-  primaryInk: '#0F3D2E',
   primarySoft: 'rgba(15,61,46,0.10)',
   // accent — terracotta, used sparingly for small actions
   accent: '#C8643E',
   accentSoft: 'rgba(200,100,62,0.12)',
   // gold — only for the logo's kintsugi seams
   gold: '#C9A13B',
-  // semantics — green = owed to you, terracotta = you owe
+  // semantics — green = done/safe, red = warning or destructive
   positive: '#1F7A3E',
   positiveSoft: 'rgba(31,122,62,0.12)',
   negative: '#C0492C',
@@ -26,7 +25,6 @@ export const Colors = {
   white: '#FFFFFF',
 };
 
-/** Fraunces everywhere: Text/TextInput from @/components/text pick its file from fontWeight. */
 export const Spacing = {
   xs: 4,
   sm: 8,
@@ -44,9 +42,9 @@ export const Radius = {
   full: 999,
 };
 
+/** Fraunces everywhere: Text/TextInput from @/components/text pick its file from fontWeight. */
 export const Type = {
   // display
-  hero: { fontSize: 52, fontWeight: '600' as const, color: Colors.ink },
   display: { fontSize: 34, fontWeight: '600' as const, color: Colors.ink },
   title: { fontSize: 22, fontWeight: '600' as const, color: Colors.ink },
   // UI
@@ -59,17 +57,3 @@ export const Type = {
   // numbers (amounts)
   num: { fontWeight: '600' as const, color: Colors.ink, fontVariant: ['tabular-nums' as const] },
 };
-
-// curated, on-brand avatar palette (deep fir, terracotta, olive, clay, teal, plum)
-export const AvatarPalette = [
-  '#0F3D2E',
-  '#C8643E',
-  '#8A7B2F',
-  '#3A6B5C',
-  '#A6533A',
-  '#5C6B3A',
-  '#7A4B3A',
-  '#2F5E55',
-  '#B07A2E',
-  '#6E4A5C',
-];

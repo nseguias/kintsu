@@ -3,7 +3,7 @@ import NfcManager, { Ndef, NfcTech, type NdefRecord } from 'react-native-nfc-man
 // ponytail: emulators have no NFC, so there we fake in-memory tags to click flows through: every
 // write lands on a fresh blank tag. Only the phone proves real tags work.
 export const simulated: Promise<boolean> = NfcManager.isSupported().then((ok) => !ok, () => true);
-export const simTags: number[][] = [];
+const simTags: number[][] = [];
 let simReads = 0; // each simulated read taps the next fake tag, round-robin
 
 simulated.then((sim) => {
@@ -22,16 +22,7 @@ async function withNdef<T>(fn: () => Promise<T>): Promise<T> {
 
 export const cancelTap = () => NfcManager.cancelTechnologyRequest().catch(() => {});
 
-export async function writeRecords(records: NdefRecord[]): Promise<void> {
-  const bytes = Ndef.encodeMessage(records) as number[];
-  if (await simulated) {
-    simTags.push(bytes);
-    return;
-  }
-  return withNdef(() => NfcManager.ndefHandler.writeNdefMessage(bytes));
-}
-
-export async function readRecords(): Promise<{ id?: string; techTypes?: string[]; records: NdefRecord[] }> {
+async function readRecords(): Promise<{ id?: string; techTypes?: string[]; records: NdefRecord[] }> {
   if (await simulated) {
     if (!simTags.length) return { id: 'SIM-0', techTypes: ['simulated'], records: [] };
     const i = simReads++ % simTags.length;
@@ -42,8 +33,6 @@ export async function readRecords(): Promise<{ id?: string; techTypes?: string[]
     return { id: tag?.id, techTypes: tag?.techTypes, records: tag?.ndefMessage ?? [] };
   });
 }
-
-export const textOf = (r: NdefRecord) => Ndef.text.decodePayload(Uint8Array.from(r.payload));
 
 /** Shown to the user as-is. */
 export class TagError extends Error {

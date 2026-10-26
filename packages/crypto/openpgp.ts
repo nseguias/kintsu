@@ -2,7 +2,7 @@ import { sha1 } from '@noble/hashes/legacy.js';
 import { concatBytes } from '@noble/hashes/utils.js';
 
 // OpenPGP card algorithm attributes for Ed25519 signing: EdDSA (22) + the Ed25519 curve OID.
-export const ED25519_OID = Uint8Array.of(0x2b, 0x06, 0x01, 0x04, 0x01, 0xda, 0x47, 0x0f, 0x01);
+const ED25519_OID = Uint8Array.of(0x2b, 0x06, 0x01, 0x04, 0x01, 0xda, 0x47, 0x0f, 0x01);
 export const ED25519_ATTRIBUTES = concatBytes(Uint8Array.of(22), ED25519_OID);
 
 /**

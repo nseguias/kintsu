@@ -15,7 +15,8 @@ export default function BackupChoice() {
   const n = Number(phrase) + Number(key) + Number(tags);
 
   const go = () => {
-    d.queue = [...(tags ? ['tags' as const] : []), ...(phrase ? ['phrase' as const] : []), ...(key ? ['key' as const] : [])];
+    // phrase first: its optional passphrase changes the key the tags and S… key hold
+    d.queue = [...(phrase ? ['phrase' as const] : []), ...(tags ? ['tags' as const] : []), ...(key ? ['key' as const] : [])];
     nextBackup(router);
   };
 

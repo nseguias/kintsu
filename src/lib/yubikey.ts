@@ -4,9 +4,8 @@ import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 
 import { simulated } from '@/lib/nfc';
 
-// Talks to the YubiKey's OpenPGP app over NFC (ISO 7816 APDUs), the same commands we first ran
-// from the Mac with gpg-connect-agent. Only the OpenPGP *signing* slot is ever touched; FIDO
-// (Gmail/X logins), OTP, PIV and OATH are separate apps these commands can't reach.
+// Talks to the YubiKey's OpenPGP app over NFC (ISO 7816 APDUs). Only the OpenPGP *signing* slot is
+// ever touched; FIDO (Gmail/X logins), OTP, PIV and OATH are separate apps these commands can't reach.
 
 export class YubiKeyError extends Error {
   constructor(message: string, public code?: 'needsAdmin') {

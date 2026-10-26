@@ -10,7 +10,7 @@ const NETWORKS = {
 
 // live bindings: importers always see the current network
 export let network: Network = 'testnet';
-export let NETWORK_PASSPHRASE: string = NETWORKS.testnet.passphrase;
+let NETWORK_PASSPHRASE: string = NETWORKS.testnet.passphrase;
 export let server = new rpc.Server(NETWORKS.testnet.rpc);
 
 export function selectNetwork(n: Network) {
@@ -20,13 +20,13 @@ export function selectNetwork(n: Network) {
 }
 
 // Weights double as roles: 5 = recovery key (account master), 2 = a phone, 1 = a second factor
-// (YubiKey, later the helper service).
+// (a YubiKey).
 //   send (medium):        2 without 2FA → phone alone; 3 with 2FA → phone + one second factor.
 //                         Second factors alone (1 + 1) never reach 3 without the phone.
 //   change keys (high):   5 → only the recovery key; phone + every factor (2 + 1 + 1) is 4.
-export const MASTER_WEIGHT = 5;
-export const DEVICE_WEIGHT = 2;
-export const COSIGNER_WEIGHT = 1;
+const MASTER_WEIGHT = 5;
+const DEVICE_WEIGHT = 2;
+const COSIGNER_WEIGHT = 1;
 const HIGH = 5;
 const medium = (cosigners: string[]) => (cosigners.length ? 3 : 2);
 
@@ -105,7 +105,7 @@ export const signersOf = (entry: xdr.AccountEntry) =>
   );
 
 /**
- * Second factors (YubiKey, helper) on the account. Accounts re-keyed by the first version (master
+ * Second factors (YubiKeys) on the account. Accounts re-keyed by the first version (master
  * weight 2, phone weight 1) had none, and their weight-1 signer is a phone, not a factor.
  */
 export const cosignersOf = (entry: xdr.AccountEntry) =>
@@ -208,8 +208,7 @@ export async function swapTx(account: string, from: Token | undefined, to: Token
 /**
  * What 1 unit of `from` is worth in `currency`, from Stellar's mainnet exchange, even on testnet (testnet
  * prices are made up): testnet USDC/EURC count as the real ones, unchecked tokens get no price.
- * The stablecoin itself counts as
- * exactly 1. Null when there's no real market: selling back what 1 unit buys must return ≥95% of it,
+ * The stablecoin itself counts as exactly 1. Null when there's no real market: selling back what 1 unit buys must return ≥95% of it,
  * otherwise one stray offer in an empty order book would set the price.
  * ponytail: a 1-unit quote is the spot price; big balances would fetch less (slippage), fine for a total.
  */
