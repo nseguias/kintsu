@@ -9,9 +9,9 @@ import { ErrorText, Icon, useBusy, List, Row, Screen, s, type IconName } from '@
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { accountExists, network, type Currency } from '@/lib/chain';
 import { backUp } from '@/lib/draft';
-import { getBackups, getCurrency, getHoldings, getTestXlm, getWallet, keepProtection, valuesIn, type Holding } from '@/lib/stellar';
+import { getBackups, getCurrency, getHoldings, getTestXlm, getWallet, isProtected, keepProtection, valuesIn, type Holding } from '@/lib/stellar';
 
-type Status = { holdings: Holding[]; values: (number | null)[]; currency: Currency; opened: boolean; backedUp: boolean };
+type Status = { holdings: Holding[]; values: (number | null)[]; currency: Currency; opened: boolean; backedUp: boolean; guarded: boolean };
 const ROW = 72; // every row in the Home list is this tall, so we can show only the ones that fit whole
 
 export default function Home() {
@@ -37,9 +37,9 @@ export default function Home() {
       await keepProtection(); // after a restore of a protected wallet: lock the old phone out
       const [holdings, opened, currency] = await Promise.all([getHoldings(), accountExists(w.account), getCurrency()]);
       const values = await valuesIn(holdings, currency);
-      setSt({ holdings, values, currency, opened, backedUp });
+      setSt({ holdings, values, currency, opened, backedUp, guarded: isProtected(w) });
     } catch (e) {
-      setSt((old) => old ?? { holdings: [], values: [], currency: 'USD', opened: true, backedUp });
+      setSt((old) => old ?? { holdings: [], values: [], currency: 'USD', opened: true, backedUp, guarded: true });
       setError(String(e).includes('Network') ? 'Can’t reach Stellar. Check your connection and pull down to refresh.' : String(e));
     }
   }, []);
@@ -95,6 +95,12 @@ export default function Home() {
       {st && !st.backedUp && (
         <List>
           <Row icon="alert-circle" tone="negative" title="Not backed up" detail="If this phone is lost, so is the wallet." onPress={() => backUp(router)} />
+        </List>
+      )}
+      {/* once there's money to lose; after the backup warning, which matters more, so they never stack */}
+      {st && st.backedUp && !st.guarded && st.holdings.some((h) => h.amount > 0) && (
+        <List>
+          <Row icon="shield-outline" tone="negative" title="Unprotected" detail="This phone alone can spend it all" onPress={() => router.push('/protect')} />
         </List>
       )}
 

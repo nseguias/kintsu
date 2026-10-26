@@ -60,7 +60,11 @@ export default function Settings() {
   return (
     <Screen>
       <List label="SECURITY">
-        <Row icon="shield-outline" title="Protection" detail={protectedNow ? 'Phone protected' : 'This phone can do everything'} onPress={() => router.push('/protect')} />
+        {protectedNow ? (
+          <Row icon="shield-checkmark" tone="positive" title="Protected" detail="This phone alone can’t move your money" onPress={() => router.push('/protect')} />
+        ) : (
+          <Row icon="alert-circle" tone="negative" title="Unprotected" detail="This phone alone can spend it all" onPress={() => router.push('/protect')} />
+        )}
       </List>
 
       <List label="BACKUPS">
