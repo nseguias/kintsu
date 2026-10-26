@@ -11,11 +11,11 @@ export default function BackupChoice() {
   const canPhrase = !!d.mnemonic && !d.imported; // an imported phrase is already on paper; an S… key has none
   const [phrase, setPhrase] = useState(canPhrase);
   const [key, setKey] = useState(false);
-  const [tags, setTags] = useState(false);
+  const [tags, setTags] = useState(true);
   const n = Number(phrase) + Number(key) + Number(tags);
 
   const go = () => {
-    d.queue = [...(phrase ? ['phrase' as const] : []), ...(key ? ['key' as const] : []), ...(tags ? ['tags' as const] : [])];
+    d.queue = [...(tags ? ['tags' as const] : []), ...(phrase ? ['phrase' as const] : []), ...(key ? ['key' as const] : [])];
     nextBackup(router);
   };
 

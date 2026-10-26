@@ -1,4 +1,4 @@
-import { MIN_PIN, createShards } from '@crypto/shards';
+import { MIN_PIN, combineShards, createShards, openShard, type Shard } from '@crypto/shards';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
@@ -7,7 +7,10 @@ import { Text } from '@/components/text';
 import { Busy, Button, ErrorText, Icon, Intro, Screen, SecretInput, s } from '@/components/ui';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { getDraft, nextBackup, seedOf } from '@/lib/draft';
-import { TagError, cancelTap, writeVerified } from '@/lib/nfc';
+import { TagError, cancelTap, readShardBytes, writeVerified } from '@/lib/nfc';
+
+const pause = () => new Promise((r) => setTimeout(r, 400));
+const same = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 export default function BackupTags() {
   const router = useRouter();
@@ -20,12 +23,19 @@ export default function BackupTags() {
   // false = start the next tag's wait right away (no tap on "Write tag N"); a failure or Cancel pauses
   const [paused, setPaused] = useState(false);
   const cancelled = useRef(false);
+  // the PIN stays in memory only until the recovery check below passes (or this screen closes)
+  const pinFor = useRef('');
+  // tags read back in the final check, by position (0-2) in the set just written
+  const [tested, setTested] = useState<{ id: string; index: number; shard: Shard }[]>([]);
+  const [recoverable, setRecoverable] = useState(false);
+  const [skipped, setSkipped] = useState(false); // the check is recommended, not required
   useEffect(() => () => void cancelTap(), []);
 
   const lock = async () => {
     setBusy('Locking with your PIN…');
     try {
       setShards(await createShards(seedOf(getDraft()), pin));
+      pinFor.current = pin;
       setPin('');
       setConfirm('');
     } catch (e) {
@@ -40,7 +50,15 @@ export default function BackupTags() {
     cancelled.current = false;
     setBusy(`Hold tag ${ids.length + 1} to the back`);
     try {
-      const id = await writeVerified(shards![ids.length], ids);
+      let id = '';
+      // the tag just written is often still on the phone: wait quietly for a new one
+      while (!id) {
+        id = await writeVerified(shards![ids.length], ids).catch(async (e) => {
+          if (!(e instanceof TagError && e.code === 'used') || cancelled.current) throw e;
+          await pause();
+          return '';
+        });
+      }
       setIds([...ids, id]);
     } catch (e) {
       setPaused(true);
@@ -49,22 +67,64 @@ export default function BackupTags() {
     setBusy('');
   };
 
+  // the real test, so all 3 tags are proven: each one is read back and opened with the PIN, then every
+  // pair rebuilds the wallet key exactly as a restore would
+  const check = async () => {
+    setError('');
+    setPaused(false);
+    cancelled.current = false;
+    setBusy(tested.length ? 'Hold another of your tags to the back' : 'Hold any of your 3 tags to the back');
+    try {
+      let tag = await readShardBytes();
+      // a tag already tested is often still on the phone: wait quietly for another
+      while (tested.some((t) => t.id === tag.id || same(shards![t.index], tag.bytes))) {
+        await pause();
+        tag = await readShardBytes();
+      }
+      const index = shards!.findIndex((b) => same(b, tag.bytes));
+      if (index < 0) throw new Error('That isn’t one of the 3 tags you just wrote.');
+      const all = [...tested, { id: tag.id, index, shard: await openShard(tag.bytes, pinFor.current) }];
+      if (all.length === 3) {
+        const seed = seedOf(getDraft());
+        for (const [a, b] of [[0, 1], [0, 2], [1, 2]]) {
+          const back = await combineShards(all[a].shard, all[b].shard).catch(() => null);
+          if (!back || !same(back, seed)) throw new Error('These tags don’t bring your wallet back. Write all 3 again on 3 different tags.');
+        }
+        pinFor.current = '';
+        setRecoverable(true);
+      }
+      setTested(all);
+    } catch (e) {
+      setPaused(true);
+      if (!cancelled.current) setError((e as Error).message || 'Lost the tag. Hold it still and try again.');
+    }
+    setBusy('');
+  };
+
   useEffect(() => {
-    if (shards && ids.length < 3 && !busy && !paused) void write();
+    if (!shards || busy || paused) return;
+    if (ids.length < 3) void write();
+    else if (!recoverable && !skipped) void check();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- write reads the same state; rerun only when these change
-  }, [shards, ids, busy, paused]);
+  }, [shards, ids, busy, paused, tested, recoverable, skipped]);
 
   if (busy) {
     const cancel = () => {
       cancelled.current = true;
       cancelTap();
     };
+    const skip = () => {
+      setSkipped(true);
+      pinFor.current = '';
+      cancel();
+    };
     if (!shards) return <Screen><Busy message={busy} /></Screen>;
     return (
       <Screen>
-        <Intro>Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.</Intro>
-        <Tags verified={ids.length} tapping />
-        <Busy message={busy} hint="We write it, then read it back to check every byte before moving on." onCancel={cancel} />
+        <Intro>{ids.length < 3 ? 'Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.' : 'Recommended: tap each tag once more, in any order, to prove they bring your wallet back.'}</Intro>
+        <Tags written={ids.length} tested={tested.map((t) => t.index)} tapping />
+        <Busy message={busy} hint={ids.length < 3 ? 'We write it, then read it back to check every byte before moving on.' : 'We rebuild your wallet from them, like a restore would.'} onCancel={ids.length < 3 ? cancel : undefined} />
+        {ids.length === 3 && <Button kind="link" title="Skip the test, I’m in a hurry" onPress={skip} />}
       </Screen>
     );
   }
@@ -87,12 +147,18 @@ export default function BackupTags() {
     );
   }
 
-  const done = ids.length === 3;
+  const done = recoverable || skipped;
   return (
     <Screen>
       <Intro>Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.</Intro>
-      <Tags verified={ids.length} />
+      <Tags written={ids.length} tested={tested.map((t) => t.index)} />
       <ErrorText>{error}</ErrorText>
+      {recoverable && (
+        <View style={[s.card, { gap: 4, borderColor: Colors.positive, backgroundColor: Colors.positiveSoft }]}>
+          <Text style={[Type.heading, { color: Colors.positive }]}>Your 3 tags are tested ✓</Text>
+          <Text style={Type.small}>We rebuilt your wallet from every pair of them with your PIN. Any 2 of the 3 bring it back.</Text>
+        </View>
+      )}
       {done && (
         <Intro>Keep the 3 tags in 3 different places. Don’t write anything on them: a blank tag gives no clue it belongs to a wallet.</Intro>
       )}
@@ -100,32 +166,44 @@ export default function BackupTags() {
       {done ? (
         <Button title="Done" onPress={() => nextBackup(router, 'tags')} />
       ) : (
-        <Button title={`Try tag ${ids.length + 1} again`} onPress={() => write()} />
+        <>
+          <Button title={ids.length < 3 ? `Try tag ${ids.length + 1} again` : 'Continue the test'} onPress={() => (ids.length < 3 ? write() : check())} />
+          {ids.length === 3 && <Button kind="link" title="Skip the test" onPress={() => { setSkipped(true); pinFor.current = ''; }} />}
+        </>
       )}
     </Screen>
   );
 }
 
-/** The 3 tag chips: verified, the one to tap now, and the ones still waiting. */
-function Tags({ verified, tapping }: { verified: number; tapping?: boolean }) {
+/**
+ * The 3 tag chips. Writing: written, the one to tap now, waiting. Then the check (all 3 written):
+ * each chip turns "Tested" once that tag has been read back, in whatever order they're tapped.
+ */
+function Tags({ written, tested, tapping }: { written: number; tested: number[]; tapping?: boolean }) {
+  const checking = written === 3;
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
       {[0, 1, 2].map((i) => {
-        const state = i < verified ? 'done' : i === verified ? 'next' : 'waiting';
+        const state = tested.includes(i) ? 'done' : checking ? 'written' : i < written ? 'written' : i === written ? 'next' : 'waiting';
         return (
           <View
             key={i}
             style={[
               s.card,
-              { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: Spacing.sm, borderWidth: 2 },
-              state === 'done' && { borderColor: Colors.positive },
+              // explicit solid: Android keeps a dashed border after the style that set it is gone
+              { flex: 1, alignItems: 'center', gap: 6, paddingHorizontal: Spacing.sm, borderWidth: 2, borderStyle: 'solid' },
+              state === 'done' && { borderColor: Colors.positive, backgroundColor: Colors.positiveSoft },
+              state === 'written' && { borderColor: Colors.positive },
               state === 'next' && { borderColor: Colors.primary },
               state === 'waiting' && { backgroundColor: Colors.surfaceAlt, borderStyle: 'dashed', borderColor: '#CFC3A0' },
             ]}>
-            <Icon name={state === 'done' ? 'checkmark' : state === 'next' ? 'radio-outline' : 'tablet-portrait-outline'} color={state === 'done' ? Colors.positive : state === 'next' ? Colors.primary : Colors.inkSoft} />
+            <Icon
+              name={state === 'done' ? 'shield-checkmark' : state === 'written' ? 'checkmark' : state === 'next' ? 'radio-outline' : 'tablet-portrait-outline'}
+              color={state === 'done' || state === 'written' ? Colors.positive : state === 'next' ? Colors.primary : Colors.inkSoft}
+            />
             <Text style={Type.heading}>Tag {i + 1}</Text>
-            <Text style={[Type.small, { fontSize: 12 }, state === 'done' && { color: Colors.positive }, state === 'next' && { color: Colors.primary }]}>
-              {state === 'done' ? 'Verified' : state === 'next' ? (tapping ? 'Tap now' : 'Next') : 'Waiting'}
+            <Text style={[Type.small, { fontSize: 12 }, (state === 'done' || state === 'written') && { color: Colors.positive }, state === 'next' && { color: Colors.primary }]}>
+              {state === 'done' ? 'Tested' : state === 'written' ? 'Written' : state === 'next' ? (tapping ? 'Tap now' : 'Next') : 'Waiting'}
             </Text>
           </View>
         );
