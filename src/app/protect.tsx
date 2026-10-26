@@ -25,7 +25,6 @@ export default function Protect() {
   const [yubikey, setYubikey] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [done, setDone] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -53,17 +52,8 @@ export default function Protect() {
   const twoFactor = !!entry && needs2fa(entry);
   const balance = entry ? Number(entry.balance) / 1e7 : 0;
 
-  if (done) {
-    return (
-      <Screen>
-        <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.md }}>
-          <Text style={[Type.title, { textAlign: 'center' }]}>Done ✓</Text>
-          <Intro>{done}</Intro>
-        </View>
-        <Button title="Back to wallet" onPress={() => router.back()} />
-      </Screen>
-    );
-  }
+  // like Send and Swap: straight back to Home, which shows a confirmation card
+  const finish = (done: string, doneDetail: string) => router.navigate({ pathname: '/home', params: { done, doneDetail } });
 
   if (busy) return <Screen><Busy message={busy} onCancel={busy.startsWith('Hold') ? cancelTap : undefined} /></Screen>;
 
@@ -71,7 +61,7 @@ export default function Protect() {
   const protect = (yk: string) =>
     run('Protecting…', async () => {
       await protectWallet(yk ? [yk] : []);
-      setDone(yk ? 'This phone can now only send, and every payment also needs your YubiKey.' : 'This phone can now only send. Changing who controls the wallet needs your backup.');
+      finish('Wallet protected', yk ? 'Every payment now also needs your YubiKey.' : 'This phone can now only send.');
     });
 
   // 2. already protected: key changes need the recovery key, brought back from the tags for one signature
@@ -79,7 +69,7 @@ export default function Protect() {
     const recovery = Keypair.fromRawEd25519Seed(Buffer.from(seed));
     if (recovery.publicKey() !== w.account) throw new Error('These tags belong to a different wallet.');
     await configure(recovery, w.signer.publicKey(), cosigners);
-    setDone(message);
+    finish('Protection updated', message);
   };
 
   if (mode === 'yubikey') {

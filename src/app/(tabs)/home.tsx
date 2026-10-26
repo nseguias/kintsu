@@ -34,6 +34,8 @@ export default function Home() {
     try {
       const w = (await getWallet())!;
       setAddress(w.account);
+      // known on the phone: update it now, not after the network calls (no stale "Unprotected" after protecting)
+      setSt((old) => old && { ...old, guarded: isProtected(w) });
       await keepProtection(); // after a restore of a protected wallet: lock the old phone out
       const [holdings, opened, currency] = await Promise.all([getHoldings(), accountExists(w.account), getCurrency()]);
       const values = await valuesIn(holdings, currency);
