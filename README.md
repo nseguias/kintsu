@@ -87,7 +87,7 @@ A 3-minute path: Create wallet → Random, 12 words → write the words down and
 
 ## Limits
 
-- Android only. iOS can't read MIFARE Classic; NTAG216 tags would fix that.
+- Android only for now. iPhone support is next, after the hackathon: iPhones can't read the MIFARE Classic tags used here, so it needs a different tag (NTAG216).
 - Two tags + PIN give full control, so a short PIN can be brute-forced by someone holding two tags. The app asks for at least 6 characters and recommends longer.
 - YubiKey is the only supported 2FA device for now.
 - Beta. Use small amounts on mainnet.
