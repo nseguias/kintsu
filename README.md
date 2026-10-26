@@ -1,18 +1,20 @@
 # Kintsu
 
-A Stellar wallet for Android where the backup is three NFC tags and spending can require a 2FA device: an offline key you tap against the phone.
+A paperless Stellar wallet for Android. No seed phrase to store: the backup is three NFC tags, and spending can require a 2FA device, an offline key you tap against the phone.
 
-Any 2 of the 3 tags plus your PIN bring the wallet back. One tag alone is random-looking bytes: it doesn't say it's a wallet, whose it is, or which piece it holds. Once the wallet is protected, the phone can't move money on its own: every payment also needs a tap of your 2FA device, and changing who controls the account needs 2 tags + PIN.
+Any 2 of the 3 tags plus your PIN bring the wallet back. One tag alone is random-looking bytes: it doesn't say it's a wallet, whose it is, or which piece it holds. Once the wallet is protected, the phone can't move money on its own: every payment also needs a tap of your 2FA device, and changing who controls the account needs 2 tags + PIN. You can still write the words on paper as a second backup, for peace of mind.
 
 Built at HackMeridian 2026 Lisbon (Genesis path, Stellar Composed + Stellar Unlocked).
 
 ## Why
 
-AI is getting very good at finding bugs. Assume anything online will be hacked, including your phone.
+People lose crypto in two ways: they get hacked, or they lose their keys.
 
-- **Your keys should come from you.** In July, a random number bug in Coldcard firmware let attackers drain thousands of Bitcoin wallets. People who had rolled their own dice were safe. ([news](https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html))
+**Hacks.** AI is getting very good at finding bugs. Assume anything online will be hacked, including your phone.
+- **Your keys should come from you.** In July, a random number bug in Coldcard firmware let attackers drain thousands of Bitcoin wallets. People who had rolled their own dice were safe. ([news](https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html)) Kintsu creates the wallet from your dice rolls or your photos.
 - **One device shouldn't be able to spend everything.** In Kintsu, a payment needs the phone and a tap of an offline 2FA device.
-- **Seed phrases get lost or stored badly.** Kintsu backs up to 3 tags you keep in different places.
+
+**Lost keys.** Seed phrases get lost, thrown away, or photographed into the cloud. Kintsu has no phrase to keep: 3 tags in 3 places, and any 2 bring the wallet back. Lose the phone, or one tag, and nothing is lost.
 
 ## What it does
 
