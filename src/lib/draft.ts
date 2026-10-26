@@ -8,8 +8,8 @@ export type Backup = 'phrase' | 'key' | 'tags';
 
 /** A wallet being created or imported. Lives only in memory between screens: never in router params or storage. */
 export type Draft = {
-  mnemonic?: string; // absent for an imported S… key
-  rawSeed?: Uint8Array; // set for an imported S… key
+  mnemonic?: string; // absent for an imported secret key
+  rawSeed?: Uint8Array; // set for an imported secret key
   passphrase: string;
   imported: boolean;
   onlyBackups?: boolean; // adding backups to the wallet already on this phone: don't touch what the phone holds

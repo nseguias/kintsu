@@ -18,7 +18,7 @@ User picks the phrase length (12 or 24 words), then the randomness source:
 
 Entropy → BIP39 words (`@scure/bip39`, English) → optional passphrase → **SEP-0005** key: BIP39 seed, then SLIP-10 ed25519 at `m/44'/148'/0'` → 32-byte ed25519 seed → `Keypair.fromRawEd25519Seed`.
 
-- Words → wallet works (import). Wallet (S… key) → words does not: derivation is one-way, and encoding a raw key as words would not be a standard phrase other wallets understand. Wallets imported from an S… key back up with tags or the S… key on paper.
+- Words → wallet works (import). Wallet (secret key) → words does not: derivation is one-way, and encoding a raw key as words would not be a standard phrase other wallets understand. Wallets imported from a secret key back up with tags or the secret key on paper.
 - A wrong passphrase silently opens a different, empty wallet. The UI says so.
 - Creating a phrase: shown once (airplane mode on), then the user picks 3 random words from 4 options each.
 
@@ -55,7 +55,7 @@ fp = SHA-256(ed25519 public key)[0..4]
 **Rotate / wipe**: "Overwrite tags" re-runs backup; "Erase tag" writes an empty NDEF message.
 
 ## Keys, weights and protection
-- **Recovery key** = the wallet's own key (phrase, paper S… key, tags); the G… address is always its. **Phone key** = random, only in this phone's SecureStore. **Second factors** = the YubiKey (OpenPGP Ed25519 key, over NFC). Only the YubiKey for now.
+- **Recovery key** = the wallet's own key (phrase, secret key on paper, tags); the G… address is always its. **Phone key** = random, only in this phone's SecureStore. **Second factors** = the YubiKey (OpenPGP Ed25519 key, over NFC). Only the YubiKey for now.
 - **Simple by default:** after creating/importing/restoring, the phone holds the recovery key and can do everything, like a normal wallet. Nothing happens on-chain on its own.
 - **Protect (optional, Home → Unprotected card or Settings):** one recovery-signed transaction adds a phone key (and optionally the YubiKey), then the recovery key is deleted from the phone. No tags needed, since the phone still holds the recovery key. Needs a backup first and enough XLM for the reserves: (2 + 1 + factors) × 0.5 XLM (`protectionMinimum`).
 - Weights double as roles (`src/lib/chain.ts`): recovery 5, phone 2, second factor 1. Thresholds: low 1, medium 2 without 2FA / 3 with it, high 5.
@@ -63,7 +63,7 @@ fp = SHA-256(ed25519 public key)[0..4]
   - Changing keys: only the recovery key; phone + every factor is 4 < 5. On a protected phone that means 2 tags + PIN (add a YubiKey, turn 2FA off).
 - `configure(recovery, phone, factors)` sets exactly that state and removes every other signer.
 - **Restore of a protected wallet** re-protects at once (`keepProtection` on Home): the old phone (weight 2) is removed, factors (weight 1) kept.
-- **Adding a backup on a protected phone:** 2 tags + PIN (or the paper, typed offline) bring the recovery key back in memory for that one backup; the phone keeps only its own key. The 12/24 words can't be re-made from the key, so new backups are tags or the S… key.
+- **Adding a backup on a protected phone:** 2 tags + PIN (or the paper, typed offline) bring the recovery key back in memory for that one backup; the phone keeps only its own key. The 12/24 words can't be re-made from the key, so new backups are tags or the secret key.
 
 ## Home, tokens, history
 - Tabs: Home, Activity, Swap, Settings. Home: "Not backed up" while there's no backup, "Unprotected" while an unprotected wallet holds funds, balance with Send/Receive/Add token/Test XLM, TOKENS. Settings shows Protected/Unprotected.

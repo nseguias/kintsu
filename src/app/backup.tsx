@@ -8,14 +8,14 @@ import { getDraft, nextBackup } from '@/lib/draft';
 export default function BackupChoice() {
   const router = useRouter();
   const d = getDraft();
-  const canPhrase = !!d.mnemonic && !d.imported; // an imported phrase is already on paper; an S… key has none
+  const canPhrase = !!d.mnemonic && !d.imported; // an imported phrase is already on paper; a secret key has none
   const [phrase, setPhrase] = useState(canPhrase);
   const [key, setKey] = useState(false);
   const [tags, setTags] = useState(true);
   const n = Number(phrase) + Number(key) + Number(tags);
 
   const go = () => {
-    // phrase first: its optional passphrase changes the key the tags and S… key hold
+    // phrase first: its optional passphrase changes the key the tags and secret key hold
     d.queue = [...(phrase ? ['phrase' as const] : []), ...(tags ? ['tags' as const] : []), ...(key ? ['key' as const] : [])];
     nextBackup(router);
   };
@@ -33,7 +33,7 @@ export default function BackupChoice() {
       />
       <Choice
         title="Secret key on paper"
-        body={d.imported && !d.mnemonic ? 'You already have it on paper.' : 'The 56-character S… key, written by hand.'}
+        body={d.imported && !d.mnemonic ? 'You already have it on paper.' : 'The 56-character key, written by hand.'}
         selected={key}
         disabled={d.imported && !d.mnemonic}
         onPress={() => setKey(!key)}

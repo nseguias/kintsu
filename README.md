@@ -8,22 +8,21 @@ Built at HackMeridian 2026 Lisbon (Genesis path, Stellar Composed + Stellar Unlo
 
 ## Why
 
-AI models are getting better at finding and exploiting bugs, fast. Anything that lives online, or on a phone that's online, should be assumed breakable. Two lessons from this year:
+AI is getting very good at finding bugs. Assume anything online will be hacked, including your phone.
 
-- **Don't trust a single device's randomness.** In July 2026 thousands of Coldcard wallets were drained because a firmware build flag made seed generation fall back to a weak software RNG ([TRM Labs](https://www.trmlabs.com/resources/blog/the-largest-hardware-wallet-exploit-of-2026-inside-the-usd-116-million-coldcard-hack), [The Hacker News](https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html)). People who had mixed in their own dice rolls were safe. Kintsu lets you create the wallet from your own dice rolls (SeedSigner-compatible, checkable with `sha256sum`) or from photos you take.
-- **Don't let one device spend everything.** A hacked or stolen phone shouldn't be enough. Kintsu uses Stellar's native multisig so that a payment needs the phone *and* a separate, offline 2FA device.
-
-And most people lose seed phrases or store them badly (screenshots, password managers). Kintsu backs up to tags you keep in different places instead, and never puts secrets on the clipboard.
+- **Your keys should come from you.** In July, a random number bug in Coldcard firmware let attackers drain thousands of Bitcoin wallets. People who had rolled their own dice were safe. ([news](https://thehackernews.com/2026/08/coldcard-hardware-wallet-flaw-linked-to.html))
+- **One device shouldn't be able to spend everything.** In Kintsu, a payment needs the phone and a tap of an offline 2FA device.
+- **Seed phrases get lost or stored badly.** Kintsu backs up to 3 tags you keep in different places.
 
 ## What it does
 
 **Create or bring back a wallet**
-- New wallet with 12 or 24 words from: the phone's RNG, your dice rolls (SeedSigner-exact: same rolls give the same words), or 2 photos mixed with the phone's RNG.
-- Import a recovery phrase or an S… secret key, or restore from 2 tags + PIN.
+- New wallet with 12 or 24 words, from the phone's randomness, your own dice rolls, or 2 photos mixed with the phone's randomness.
+- Import a recovery phrase or a secret key, or restore from 2 tags + PIN.
 - Keys follow SEP-0005, so the phrase also works in other Stellar wallets.
 
 **Back up**
-- 3 NFC tags + PIN (default, recommended), the phrase on paper, or the S… key on paper. Pick one or more.
+- 3 NFC tags + PIN (default, recommended), the phrase on paper, or the secret key on paper. Pick one or more.
 - Each tag is written, read back and compared byte by byte. At the end you can tap each tag again: the app rebuilds the key from every pair, exactly as a restore would, so you know any 2 of the 3 work. You can skip that if you're in a hurry.
 
 **Protect (optional)**
@@ -92,7 +91,3 @@ A 3-minute path: Create wallet → Random, 12 words → write the words down and
 - Two tags + PIN give full control, so a short PIN can be brute-forced by someone holding two tags. The app asks for at least 6 characters and recommends longer.
 - YubiKey is the only supported 2FA device for now.
 - Beta. Use small amounts on mainnet.
-
-## Built during the event
-
-The first commit (Sun 25 Oct, 17:12) is the project setup reused from my earlier app, Open Tab: Expo config, theme, a minimal Stellar client and an NFC smoke test. Everything after it was built during HackMeridian: the crypto package, wallet creation and import, tag backup and restore, the multisig protection with 2FA, send/swap/tokens/activity, and the design. See `git log`.

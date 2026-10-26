@@ -10,7 +10,7 @@ export default function Recover() {
       <Intro>Bring back a wallet from any of its backups. Kintsu or any other Stellar wallet.</Intro>
       <List>
         <Row icon="document-text-outline" title="Recovery phrase" detail="12 or 24 words on paper" onPress={() => router.push('/import?mode=phrase')} />
-        <Row icon="key-outline" title="Secret key" detail="The 56-character S… key on paper" onPress={() => router.push('/import?mode=key')} />
+        <Row icon="key-outline" title="Secret key" detail="The 56-character key on paper" onPress={() => router.push('/import?mode=key')} />
         <Row icon="radio-outline" title="NFC tags" detail="Any 2 of your 3 tags plus your PIN" onPress={() => router.push('/restore')} />
       </List>
     </Screen>

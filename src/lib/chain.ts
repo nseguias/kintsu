@@ -245,7 +245,7 @@ export type PaymentRequest = { to: string; amount?: string; memo?: string };
 
 /**
  * What a scanned QR asks for: a bare G… address, or a SEP-7 `web+stellar:pay?destination=…` link
- * (amount and text memo carried over). Anything else, including an S… secret, gives null.
+ * (amount and text memo carried over). Anything else, including a secret key, gives null.
  */
 export function parsePaymentQr(text: string): PaymentRequest | null {
   const raw = text.trim();

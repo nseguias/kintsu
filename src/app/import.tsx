@@ -65,7 +65,7 @@ export default function Import() {
         ) : (
           <>
             <Text style={s.label}>SECRET KEY</Text>
-            <SecretInput value={secret} onChangeText={(t) => setSecret(t.toUpperCase())} maxLength={56} placeholder="S…" style={Type.mono} />
+            <SecretInput value={secret} onChangeText={(t) => setSecret(t.toUpperCase())} maxLength={56} placeholder="Secret key" style={Type.mono} />
             <Text style={Type.small}>
               Type it from your paper; paste is turned off. {secret.length}/56 characters{secret.length === 56 && !keyOk ? ', but it isn’t a valid key. Check for a typo.' : '.'}
             </Text>
