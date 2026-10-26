@@ -130,14 +130,18 @@ export async function needsYubiKey(): Promise<boolean> {
   return (await accountExists(w.account)) && needs2fa(await server.getAccountEntry(w.account));
 }
 
-/** Signs with this phone, plus the YubiKey when 2FA is on (`pin` then required), and submits. */
-export async function approve(tx: Transaction, pin?: string, onTap?: () => void): Promise<void> {
+/**
+ * Signs with this phone, plus the YubiKey when 2FA is on (`pin` then required), and submits.
+ * `say` gets what to show while waiting: the YubiKey tap, then `doing` once it has signed.
+ */
+export async function approve(tx: Transaction, pin?: string, say?: (message: string) => void, doing = 'Sending…'): Promise<void> {
   const w = await requireWallet();
   const entry = await server.getAccountEntry(w.account);
   if (needs2fa(entry)) {
     if (!pin) throw new Error('Needs your YubiKey PIN.');
-    onTap?.();
+    say?.('Hold your YubiKey flat against the back of your phone');
     const { address, signature } = await signWithYubiKey(tx.hash(), pin);
+    say?.(`Signed with your YubiKey ✓\n${doing}`);
     if (!cosignersOf(entry).includes(address)) throw new Error('That YubiKey isn’t one of this wallet’s second factors.');
     tx.addSignature(address, Buffer.from(signature).toString('base64'));
   }

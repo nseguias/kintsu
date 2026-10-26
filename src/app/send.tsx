@@ -75,7 +75,7 @@ export default function Send() {
     setBusy('Sending…');
     try {
       const { tx } = review!;
-      await approve(tx, pin, () => setBusy('Hold your YubiKey flat against the back of your phone'));
+      await approve(tx, pin, setBusy);
       router.navigate({ pathname: '/home', params: { done: 'Sent', doneDetail: `${amount} ${code} to ${dest.slice(0, 6)}…${dest.slice(-6)}` } });
     } catch (e) {
       // a half-signed transaction can't be retried as is; Review builds a fresh one

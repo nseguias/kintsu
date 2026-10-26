@@ -73,7 +73,7 @@ export default function Swap() {
     setBusy('Swapping…');
     try {
       const tx = await swapTx(account, fromToken, toToken, amount, q!.amount * (1 - SLIPPAGE), q!.path, addTo);
-      await approve(tx, pin, () => setBusy('Hold your YubiKey flat against the back of your phone'));
+      await approve(tx, pin, setBusy, 'Swapping…');
       setAmount('');
       router.navigate({ pathname: '/home', params: { done: 'Swap complete', doneDetail: `${amount} ${fromCode} → about ${fmt(q!.amount)} ${toCode}` } });
     } catch (e) {

@@ -35,7 +35,7 @@ export default function Tokens() {
     setBusy('Adding…');
     try {
       const w = (await getWallet())!;
-      await approve(await addTokenTx(w.account, picked!), pin, () => setBusy('Hold your YubiKey flat against the back of your phone'));
+      await approve(await addTokenTx(w.account, picked!), pin, setBusy, 'Adding…');
       router.back();
     } catch (e) {
       setError((e as Error).message || 'Lost the YubiKey. Hold it still and try again.');
