@@ -47,6 +47,9 @@ async function session<T>(fn: (send: Send) => Promise<T>): Promise<T> {
     };
     await send(SELECT_OPENPGP);
     return await fn(send);
+  } catch (e) {
+    if (e instanceof YubiKeyError || !/transceive|lost|IOException/i.test(String((e as Error)?.message ?? e))) throw e;
+    throw new YubiKeyError('The YubiKey moved away too soon. Hold it flat against the back until it’s done.');
   } finally {
     await NfcManager.cancelTechnologyRequest().catch(() => {});
   }

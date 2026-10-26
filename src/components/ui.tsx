@@ -227,9 +227,11 @@ export function Segmented<T extends string | number>({ options, value, onChange 
  */
 const MAX_INSERT = 3;
 export function SecretInput({ value, onChangeText, style, ...props }: TextInputProps & { value: string; onChangeText: (t: string) => void }) {
-  return (
+  const [shown, setShown] = useState(false);
+  const input = (
     <TextInput
       {...props}
+      secureTextEntry={props.secureTextEntry && !shown}
       value={value}
       onChangeText={(t) => t.length - value.length <= MAX_INSERT && onChangeText(t)}
       contextMenuHidden
@@ -240,8 +242,17 @@ export function SecretInput({ value, onChangeText, style, ...props }: TextInputP
       spellCheck={false}
       keyboardType={props.secureTextEntry ? 'default' : 'visible-password'}
       placeholderTextColor={Colors.inkFaint}
-      style={[s.input, style]}
+      style={[s.input, props.secureTextEntry && { paddingRight: 52 }, style]}
     />
+  );
+  if (!props.secureTextEntry) return input;
+  return (
+    <View style={{ justifyContent: 'center' }}>
+      {input}
+      <Pressable onPress={() => setShown(!shown)} hitSlop={12} accessibilityRole="button" accessibilityLabel={shown ? 'Hide' : 'Show'} style={{ position: 'absolute', right: 16 }}>
+        <Icon name={shown ? 'eye-off-outline' : 'eye-outline'} color={Colors.inkSoft} />
+      </Pressable>
+    </View>
   );
 }
 

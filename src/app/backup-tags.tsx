@@ -123,7 +123,7 @@ export default function BackupTags() {
     return (
       <Screen>
         <Intro>{ids.length < 3 ? 'Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.' : 'Testing your tags: tap each one again, in any order. We rebuild your wallet from them, like a restore would.'}</Intro>
-        <Tags written={ids.length} tested={tested.map((t) => t.index)} tapping />
+        <Tags written={ids.length} tested={tested.length} tapping />
         <Busy message={busy} hint={ids.length < 3 ? 'We write it, then read it back to check every byte before moving on.' : undefined} onCancel={ids.length < 3 ? cancel : undefined} />
         {ids.length === 3 && <Button kind="link" title="Skip the test, I’m in a hurry" onPress={skip} />}
       </Screen>
@@ -152,7 +152,7 @@ export default function BackupTags() {
   return (
     <Screen>
       <Intro>Any 2 of these 3 tags plus your PIN bring your wallet back. Keep them in different places.</Intro>
-      <Tags written={ids.length} tested={tested.map((t) => t.index)} />
+      <Tags written={ids.length} tested={tested.length} />
       <ErrorText>{error}</ErrorText>
       {recoverable && (
         <View style={[s.card, { gap: 4, borderColor: Colors.positive, backgroundColor: Colors.positiveSoft }]}>
@@ -189,15 +189,15 @@ export default function BackupTags() {
 }
 
 /**
- * The 3 tag chips. Writing: written, the one to tap now, waiting. Then the check (all 3 written):
- * each chip turns "Tested" once that tag has been read back, in whatever order they're tapped.
+ * The 3 tag chips, filled in tap order: written, the one to tap now, waiting. The test fills them
+ * again the same way. Tags carry no labels, so the count of taps is what the user can follow.
  */
-function Tags({ written, tested, tapping }: { written: number; tested: number[]; tapping?: boolean }) {
-  const checking = written === 3;
+function Tags({ written, tested, tapping }: { written: number; tested: number; tapping?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', gap: 10 }}>
       {[0, 1, 2].map((i) => {
-        const state = tested.includes(i) ? 'done' : checking ? 'written' : i < written ? 'written' : i === written ? 'next' : 'waiting';
+        const at = written < 3 ? written : tested;
+        const state = written === 3 && i < tested ? 'done' : i < at || (written === 3 && !tapping) ? 'written' : i === at ? 'next' : 'waiting';
         return (
           <View
             key={i}
