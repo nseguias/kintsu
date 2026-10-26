@@ -1,6 +1,6 @@
 # Kintsu
 
-A paperless Stellar wallet for Android. No seed phrase to store: the backup is three NFC tags, and spending can require a 2FA device, an offline key you tap against the phone.
+A Stellar wallet for Android with no single point of failure: the backup is distributed across 3 NFC tags, and spending needs a 2FA device, an offline key you tap against the phone.
 
 Any 2 of the 3 tags plus your PIN bring the wallet back. One tag alone is random-looking bytes: it doesn't say it's a wallet, whose it is, or which piece it holds. Once the wallet is protected, the phone can't move money on its own: every payment also needs a tap of your 2FA device, and changing who controls the account needs 2 tags + PIN. You can still write the words on paper as a second backup, for peace of mind.
 
